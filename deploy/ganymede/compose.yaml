@@ -1,0 +1,102 @@
+name: camcore-tracearr
+
+services:
+  tracearr:
+    image: ghcr.io/camcoreau/tracearr:latest
+    container_name: camcore-tracearr
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      TZ: ${TZ:-Australia/Melbourne}
+      DATABASE_URL: postgres://tracearr:${DB_PASSWORD:?Set DB_PASSWORD in .env}@database:5432/tracearr
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      COOKIE_SECRET: ${COOKIE_SECRET:?Set COOKIE_SECRET in .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://tracearr.camcore.network}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "3000"
+    volumes:
+      - tracearr_backups:/data/backup
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - tracearr-internal
+      - npm-backend
+    labels:
+      com.camcore.service: tracearr
+      com.camcore.host: ganymede
+      com.camcore.network: CamCore Network
+
+  database:
+    image: timescale/timescaledb-ha:pg18.1-ts2.25.0
+    container_name: camcore-tracearr-db
+    shm_size: 512mb
+    command: >-
+      postgres
+      -c timescaledb.license=timescale
+      -c timescaledb.max_tuples_decompressed_per_dml_transaction=0
+      -c max_locks_per_transaction=4096
+      -c timescaledb.telemetry_level=off
+    environment:
+      POSTGRES_USER: tracearr
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: tracearr
+      TZ: ${TZ:-Australia/Melbourne}
+    volumes:
+      - tracearr_database:/home/postgres/pgdata/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracearr -d tracearr"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    networks:
+      - tracearr-internal
+
+  redis:
+    image: redis:8-alpine
+    container_name: camcore-tracearr-redis
+    command: redis-server --appendonly yes
+    environment:
+      TZ: ${TZ:-Australia/Melbourne}
+    volumes:
+      - tracearr_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - tracearr-internal
+
+networks:
+  tracearr-internal:
+    name: camcore-tracearr-internal
+    internal: true
+  npm-backend:
+    external: true
+
+volumes:
+  tracearr_database:
+    name: camcore-tracearr-database
+  tracearr_redis:
+    name: camcore-tracearr-redis
+  tracearr_backups:
+    name: camcore-tracearr-backups
