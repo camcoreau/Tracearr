@@ -83,7 +83,7 @@ export const servers = pgTable(
     type: varchar('type', { length: 20 }).notNull().$type<(typeof serverTypeEnum)[number]>(),
     url: text('url').notNull(),
     token: text('token').notNull(), // Encrypted
-    machineIdentifier: varchar('machine_identifier', { length: 100 }), // Plex clientIdentifier for dedup
+    machineIdentifier: varchar('machine_identifier', { length: 100 }), // The media server's own id: Plex clientIdentifier (also used for dedup), Jellyfin/Emby System/Info Id
     // For Plex servers: which linked Plex account this server was added from (nullable for Jellyfin/Emby and legacy)
     plexAccountId: uuid('plex_account_id'),
     displayOrder: integer('display_order').default(0).notNull(),
@@ -376,7 +376,8 @@ export const sessions = pgTable(
     index('sessions_server_user_time_idx').on(table.serverUserId, table.startedAt),
     index('sessions_server_time_idx').on(table.serverId, table.startedAt),
     index('sessions_state_idx').on(table.state),
-    index('sessions_external_session_idx').on(table.serverId, table.externalSessionId),
+    // sessions_external_session_idx removed - the only predicates on external_session_id
+    // (import cursor CAST, dedup regex) are non-sargable for a btree
     index('sessions_active_lookup_idx').on(table.serverId, table.sessionKey, table.stoppedAt),
     index('sessions_device_idx').on(table.serverUserId, table.deviceId),
     index('sessions_reference_idx').on(table.referenceId), // For session grouping queries
@@ -390,16 +391,16 @@ export const sessions = pgTable(
       table.startedAt
     ),
     // Indexes for stats queries
-    index('sessions_geo_idx').on(table.geoLat, table.geoLon), // For /stats/locations basic geo lookup
-    // sessions_geo_time_idx removed - superseded by idx_sessions_geo_partial in timescale.ts
+    // sessions_geo_idx and sessions_geo_time_idx removed - every geo predicate carries
+    // IS NOT NULL, so idx_sessions_geo_partial in timescale.ts covers them all
     index('sessions_media_type_idx').on(table.mediaType), // For media type aggregations
     index('sessions_transcode_idx').on(table.isTranscode), // For quality stats
     index('sessions_platform_idx').on(table.platform), // For platform stats
     // sessions_top_movies_idx and sessions_top_shows_idx removed - superseded by time-prefixed variants in timescale.ts
     // Covering index for history aggregates queries (server + date range + reference_id for COUNT DISTINCT)
     index('idx_sessions_server_date_ref').on(table.serverId, table.startedAt, table.referenceId),
-    // Index for stale session detection (active sessions that haven't been seen recently)
-    index('sessions_stale_detection_idx').on(table.lastSeenAt, table.stoppedAt),
+    // sessions_stale_detection_idx removed - the stale sweep is the only last_seen_at
+    // predicate and idx_sessions_open_last_seen (partial, timescale.ts) matches it exactly
     index('sessions_media_idx').on(table.mediaId, table.startedAt),
     index('sessions_show_media_idx').on(table.showMediaId, table.startedAt),
   ]
@@ -1084,6 +1085,11 @@ export const libraryItems = pgTable(
     // Composite index for media type filtering (used by nearly all library routes)
     index('idx_library_items_server_media_type').on(table.serverId, table.mediaType),
 
+    // The image pipeline's dominant-color persist and stored-color read both
+    // filter on (server_id, thumb_path); without this they seq-scan the table
+    // once per poster during a cache warm
+    index('idx_library_items_server_thumb').on(table.serverId, table.thumbPath),
+
     // Composite index for growth queries (created_at range filtering with server context)
     index('idx_library_items_server_created').on(table.serverId, table.createdAt),
 
@@ -1289,10 +1295,6 @@ export const librarySnapshots = pgTable(
     // cannot be derived from overlapping buckets.
     countHighQuality: integer('count_high_quality'),
     versionCount: integer('version_count'),
-
-    // Enrichment status tracking
-    enrichmentPending: integer('enrichment_pending').notNull().default(0),
-    enrichmentComplete: integer('enrichment_complete').notNull().default(0),
   },
   (table) => [
     // Unique (also covers the same composite time-series query pattern):

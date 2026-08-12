@@ -39,6 +39,7 @@ import type {
   DashboardStats,
   TautulliImportProgress,
   JellystatImportProgress,
+  PlaybackReportingImportProgress,
   MaintenanceJobProgress,
   LibrarySyncProgress,
 } from '@tracearr/shared';
@@ -160,6 +161,7 @@ import {
   initTimescaleDB,
   getTimescaleStatus,
   updateTimescaleExtensions,
+  warnOnTimescaleVersionDrift,
   runAggregateBackfill,
   isCompressionPolicyDegraded,
   retryDegradedCompressionPolicy,
@@ -168,6 +170,7 @@ import { eq } from 'drizzle-orm';
 import { servers } from './db/schema.js';
 import { initializeClaimCode } from './utils/claimCode.js';
 import { registerService, unregisterService } from './services/serviceTracker.js';
+import { backfillMissingServerIdentifiers } from './services/serverIdentity.js';
 import {
   getServerMode,
   setServerMode,
@@ -240,8 +243,8 @@ async function refreshTimescaleCache(): Promise<void> {
       compression: tsStatus.compressionEnabled,
       aggregates: tsStatus.continuousAggregates.length,
       chunks: tsStatus.chunkCount,
-      // Not folded into getTimescaleStatus()'s 5-minute cache - this needs to
-      // reflect the degraded flag promptly so it retries and surfaces quickly.
+      // Locally-marked degradation surfaces instantly (in-process hint);
+      // another instance's flag surfaces within the check's own short TTL.
       compressionDegraded: await isCompressionPolicyDegraded(),
     };
   } catch {
@@ -617,19 +620,25 @@ async function initializeServices(app: FastifyInstance) {
   // Connect the lazy Redis client
   await connectRedis(app);
 
-  // Update TimescaleDB extensions before migrations — must happen before any
+  // Update TimescaleDB extensions before migrations: must happen before any
   // query touches timescaledb objects, otherwise the old version gets locked in.
-  // Opt-in only: requires ALTER EXTENSION privilege, which managed DB hosts often lack.
-  // Note: we generally dont want users to update extensions since it can cause issues.
-  //
-  // This is disabled for now, but the code is left in place for a rainy day.
-  // Future devs: do not remove this functionality.
-  // eslint-disable-next-line no-constant-condition
-  if (false) {
+  // Opt-in (TIMESCALEDB_AUTO_UPDATE): the update is one-way, needs ALTER
+  // EXTENSION privilege (managed hosts often lack it), and rolling the image
+  // back after an update leaves the database unable to load the extension.
+  // When disabled, a version drift still gets a loud warning: bumping the
+  // database image does NOT update the extension inside the database, and the
+  // gap otherwise goes unnoticed.
+  if (process.env.TIMESCALEDB_AUTO_UPDATE === 'true') {
     try {
       await updateTimescaleExtensions();
     } catch (err) {
       app.log.warn({ err }, 'Failed to update TimescaleDB extensions (non-fatal)');
+    }
+  } else {
+    try {
+      await warnOnTimescaleVersionDrift(app.log);
+    } catch {
+      // Drift check is best-effort; boot continues either way
     }
   }
 
@@ -1086,6 +1095,12 @@ async function initializePostListen(app: FastifyInstance) {
         case WS_EVENTS.IMPORT_JELLYSTAT_PROGRESS:
           broadcastToSessions('import:jellystat:progress', data as JellystatImportProgress);
           break;
+        case WS_EVENTS.IMPORT_PLAYBACK_REPORTING_PROGRESS:
+          broadcastToSessions(
+            'import:playbackreporting:progress',
+            data as PlaybackReportingImportProgress
+          );
+          break;
         case WS_EVENTS.MAINTENANCE_PROGRESS:
           broadcastToSessions('maintenance:progress', data as MaintenanceJobProgress);
           break;
@@ -1129,6 +1144,15 @@ async function initializePostListen(app: FastifyInstance) {
     } catch (err) {
       app.log.error({ err }, 'Failed to start SSE connections - falling back to polling');
     }
+
+    // One bounded pass per leadership term; nothing else sweeps these rows.
+    void backfillMissingServerIdentifiers(app.log)
+      .then((filled) => {
+        if (filled > 0) app.log.info(`Recorded identifiers for ${filled} server(s)`);
+      })
+      .catch((err: unknown) => {
+        app.log.debug({ err }, 'Server identifier backfill failed');
+      });
   };
 
   const stopProducers = async (): Promise<void> => {

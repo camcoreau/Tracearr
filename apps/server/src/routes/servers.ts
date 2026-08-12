@@ -10,19 +10,19 @@ import {
   reorderServersSchema,
   updateServerSchema,
   pickServerColor,
-  SERVER_STATS_CONFIG,
-  BANDWIDTH_STATS_CONFIG,
   type ServerConnectionStatus,
 } from '@tracearr/shared';
 import { db } from '../db/client.js';
 import { servers, plexAccounts } from '../db/schema.js';
 // Token encryption removed - tokens now stored in plain text (DB is localhost-only)
 import { PlexClient, JellyfinClient, EmbyClient } from '../services/mediaServer/index.js';
+import { getServerLiveStats, getServerResourceStats } from '../services/serverLiveStats.js';
 import { syncServer } from '../services/sync.js';
 import { sseManager } from '../services/sseManager.js';
 import { getCacheService } from '../services/cache.js';
 import { enqueueLibrarySync } from '../jobs/librarySyncQueue.js';
 import { invalidateServersCache } from '../jobs/poller/database.js';
+import { buildServerAccessCondition } from '../utils/serverFiltering.js';
 
 export const serverRoutes: FastifyPluginAsync = async (app) => {
   /**
@@ -39,19 +39,14 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
         name: servers.name,
         type: servers.type,
         url: servers.url,
+        machineIdentifier: servers.machineIdentifier,
         displayOrder: servers.displayOrder,
         color: servers.color,
         createdAt: servers.createdAt,
         updatedAt: servers.updatedAt,
       })
       .from(servers)
-      .where(
-        authUser.role === 'owner'
-          ? undefined // Owners see all servers
-          : authUser.serverIds.length > 0
-            ? inArray(servers.id, authUser.serverIds)
-            : undefined // No serverIds = no access (will return empty)
-      )
+      .where(buildServerAccessCondition(authUser, servers.id))
       .orderBy(asc(servers.displayOrder));
 
     // Backfill colors for any servers missing them
@@ -556,12 +551,7 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
       return reply.badRequest('Server statistics are only available for Plex servers');
     }
 
-    const client = new PlexClient({
-      url: server.url,
-      token: server.token,
-    });
-
-    const data = await client.getServerStatistics(SERVER_STATS_CONFIG.TIMESPAN_SECONDS);
+    const data = await getServerResourceStats(app.redis, server);
 
     return {
       serverId: id,
@@ -571,11 +561,14 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
   });
 
   /**
-   * GET /servers/:id/bandwidth - Get server bandwidth statistics (Local/Remote)
-   * On-demand endpoint for dashboard - data is not stored
-   * Currently only supported for Plex servers (undocumented /statistics/bandwidth endpoint)
+   * GET /servers/:id/live-stats - Combined resource and bandwidth statistics
+   * One request per dashboard tick, for any server type: Plex serves its
+   * statistics endpoints behind a short Redis cache, Jellyfin/Emby serve the
+   * rolling buffer the SSE plugin's server.stats events fill (empty until
+   * the plugin reports), so multi-server dashboards fan out without
+   * special-casing type.
    */
-  app.get('/:id/bandwidth', { preHandler: [app.authenticate] }, async (request, reply) => {
+  app.get('/:id/live-stats', { preHandler: [app.authenticate] }, async (request, reply) => {
     const params = serverIdParamSchema.safeParse(request.params);
     if (!params.success) {
       return reply.badRequest('Invalid server ID');
@@ -590,20 +583,18 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
       return reply.notFound('Server not found');
     }
 
-    if (server.type !== 'plex') {
-      return reply.badRequest('Bandwidth statistics are only available for Plex servers');
-    }
+    const stats = await getServerLiveStats(app.redis, server);
 
-    const client = new PlexClient({
-      url: server.url,
-      token: server.token,
-    });
-
-    const data = await client.getServerBandwidth(BANDWIDTH_STATS_CONFIG.TIMESPAN_SECONDS);
+    // Per-account/device attribution names other users' accounts; the charts
+    // only need the aggregated series, so the detail is owner-only
+    const includeDetail = request.user?.role === 'owner';
 
     return {
       serverId: id,
-      data,
+      ...stats,
+      ...(includeDetail
+        ? {}
+        : { bandwidthSamples: [], bandwidthAccounts: [], bandwidthDevices: [] }),
       fetchedAt: new Date().toISOString(),
     };
   });
@@ -702,13 +693,7 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
         name: servers.name,
       })
       .from(servers)
-      .where(
-        authUser.role === 'owner'
-          ? undefined
-          : authUser.serverIds.length > 0
-            ? inArray(servers.id, authUser.serverIds)
-            : undefined
-      );
+      .where(buildServerAccessCondition(authUser, servers.id));
 
     const cacheService = getCacheService();
     const unhealthyServers: { serverId: string; serverName: string }[] = [];
@@ -744,13 +729,7 @@ export const serverRoutes: FastifyPluginAsync = async (app) => {
         type: servers.type,
       })
       .from(servers)
-      .where(
-        authUser.role === 'owner'
-          ? undefined
-          : authUser.serverIds.length > 0
-            ? inArray(servers.id, authUser.serverIds)
-            : undefined
-      );
+      .where(buildServerAccessCondition(authUser, servers.id));
 
     const cacheService = getCacheService();
     const result: ServerConnectionStatus[] = [];
