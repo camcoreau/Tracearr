@@ -603,6 +603,34 @@
       "when": 1786304296940,
       "tag": "0085_far_captain_universe",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1786637120879,
+      "tag": "0086_material_sandman",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1786642183387,
+      "tag": "0087_normal_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1786986044956,
+      "tag": "0088_warm_mac_gargan",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1787178482298,
+      "tag": "0089_zippy_frank_castle",
+      "breakpoints": true
     }
   ]
 }

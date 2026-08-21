@@ -10,6 +10,8 @@ import type {
   ActiveSession,
   Rule,
   ViolationWithDetails,
+  ViolationRosterFilters,
+  ViolationSortField,
   DashboardStats,
   PlayStats,
   UserStats,
@@ -28,8 +30,11 @@ import type {
   PlexAccountsResponse,
   LinkPlexAccountResponse,
   UnlinkPlexAccountResponse,
-  NotificationChannelRouting,
-  NotificationEventType,
+  ReauthorizePlexAccountResponse,
+  Destination,
+  DestinationKind,
+  CreateDestinationInput,
+  UpdateDestinationInput,
   HistorySessionResponse,
   HistoryFilterOptions,
   RulesFilterOptions,
@@ -41,7 +46,6 @@ import type {
   ShowStatsResponse,
   SetupStatus,
   MediaType,
-  WebhookFormat,
   ServerConnectionStatus,
   // New analytics types
   DeviceCompatibilityResponse,
@@ -81,6 +85,8 @@ import type {
   MergeSuggestion,
   ServerUserSplitResult,
   UserSortField,
+  UserRosterFilters,
+  ListResponse,
   // Media browsing types
   WatchedState,
   CatalogResponse,
@@ -114,6 +120,30 @@ import { API_BASE_PATH, getClientTimezone } from '@tracearr/shared';
 import { BASE_PATH } from '@/lib/basePath';
 export { BASE_PATH, BASE_URL, imageProxyUrl } from '@/lib/basePath';
 import { MAINTENANCE_EVENT } from '@/hooks/useMaintenanceMode';
+
+/** Roster query params: the server's own filter schema plus paging and sort. */
+export type UserListParams = Partial<UserRosterFilters> & {
+  page?: number;
+  pageSize?: number;
+  orderBy?: UserSortField;
+  orderDir?: 'asc' | 'desc';
+};
+
+/** Violation query params: the server's own filter schema plus paging and sort. */
+export type ViolationListParams = Partial<ViolationRosterFilters> & {
+  page?: number;
+  pageSize?: number;
+  orderBy?: ViolationSortField;
+  orderDir?: 'asc' | 'desc';
+};
+
+export interface BulkViolationParams {
+  ids?: string[];
+  selectAll?: boolean;
+  /** The filters the table was showing; a narrower set dismisses more
+   *  violations than the user could see. */
+  filters?: Partial<ViolationRosterFilters>;
+}
 
 // GET /library/media/:id/history has no shared-package response type yet (its
 // query builder still returns the public v2 snake_case play shape rather than
@@ -169,35 +199,6 @@ export interface StatsTimeRange {
   startDate?: string; // ISO date string
   endDate?: string; // ISO date string
   timezone?: string; // IANA timezone (e.g., 'America/Los_Angeles')
-}
-
-// Rules V2 migration response types
-export interface MigrationPreviewItem {
-  id: string;
-  name: string;
-  type: string;
-  conditions: unknown;
-  actions: unknown;
-}
-
-export interface MigrationPreviewResponse {
-  total: number;
-  alreadyMigrated: number;
-  toMigrate: number;
-  preview: MigrationPreviewItem[];
-}
-
-export interface MigrationResponse {
-  success: boolean;
-  migrated: { id: string; name: string }[];
-  skipped: { id: string; name: string; reason: string }[];
-  errors: { id: string; name: string; error: string }[];
-  summary: {
-    total: number;
-    migrated: number;
-    skipped: number;
-    failed: number;
-  };
 }
 
 // Re-export shared timezone helper for backwards compatibility
@@ -293,11 +294,14 @@ export const API_BASE_URL = `${BASE_PATH}${API_BASE_PATH}`;
 /** Carries the response status so callers can distinguish e.g. a 404 from a network failure. */
 export class ApiError extends Error {
   status: number;
+  /** Parsed error body, for endpoints whose failure carries detail (a 409 delete lists the blocking rules). */
+  body: Record<string, unknown>;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, body: Record<string, unknown> = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -361,7 +365,8 @@ class ApiClient {
       const errorBody = (await response.json().catch(() => ({}))) as Record<string, unknown>;
       throw new ApiError(
         ((errorBody.message ?? errorBody.error) as string) ?? `Request failed: ${response.status}`,
-        response.status
+        response.status,
+        errorBody
       );
     }
 
@@ -461,6 +466,13 @@ class ApiClient {
     // Link a new Plex account via OAuth PIN (authenticated - owner only)
     linkPlexAccount: (pin: string) =>
       this.request<LinkPlexAccountResponse>('/auth/plex/link-account', {
+        method: 'POST',
+        body: JSON.stringify({ pin }),
+      }),
+
+    // Replace a linked Plex account's token via a fresh OAuth PIN (owner only)
+    reauthorizePlexAccount: (accountId: string, pin: string) =>
+      this.request<ReauthorizePlexAccountResponse>(`/auth/plex/accounts/${accountId}/reauthorize`, {
         method: 'POST',
         body: JSON.stringify({ pin }),
       }),
@@ -578,30 +590,17 @@ class ApiClient {
 
   // Users
   users = {
-    list: (params?: {
-      page?: number;
-      pageSize?: number;
-      serverId?: string;
-      serverIds?: string[];
-      includeRemoved?: boolean;
-      search?: string;
-      orderBy?: UserSortField;
-      orderDir?: 'asc' | 'desc';
-    }) => {
+    list: (params: UserListParams = {}) => {
       const searchParams = new URLSearchParams();
-      if (params?.page) searchParams.set('page', String(params.page));
-      if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize));
-      if (params?.serverId) searchParams.set('serverId', params.serverId);
-      if (params?.serverIds?.length) {
-        for (const id of params.serverIds) {
-          searchParams.append('serverIds', id);
+      for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === false || value === '') continue;
+        if (Array.isArray(value)) {
+          for (const entry of value) searchParams.append(key, entry);
+        } else {
+          searchParams.set(key, String(value));
         }
       }
-      if (params?.includeRemoved) searchParams.set('includeRemoved', 'true');
-      if (params?.search) searchParams.set('search', params.search);
-      if (params?.orderBy) searchParams.set('orderBy', params.orderBy);
-      if (params?.orderDir) searchParams.set('orderDir', params.orderDir);
-      return this.request<PaginatedResponse<ServerUserWithIdentity>>(
+      return this.request<ListResponse<ServerUserWithIdentity>>(
         `/users?${searchParams.toString()}`
       );
     },
@@ -653,7 +652,9 @@ class ApiClient {
     bulkResetTrust: (params: {
       ids?: string[];
       selectAll?: boolean;
-      filters?: { serverId?: string; serverIds?: string[]; includeRemoved?: boolean };
+      /** The roster filters the table was showing; a narrower set resets more
+       *  people than the user could see. */
+      filters?: Partial<UserRosterFilters>;
     }) =>
       this.request<{ success: boolean; updated: number }>('/users/bulk/reset-trust', {
         method: 'POST',
@@ -823,8 +824,6 @@ class ApiClient {
       const response = await this.request<{ data: Rule[] }>('/rules');
       return response.data;
     },
-    create: (data: Omit<Rule, 'id' | 'createdAt' | 'updatedAt'>) =>
-      this.request<Rule>('/rules', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Rule>) =>
       this.request<Rule>(`/rules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => this.request<void>(`/rules/${id}`, { method: 'DELETE' }),
@@ -844,54 +843,24 @@ class ApiClient {
       this.request<Rule>('/rules/v2', { method: 'POST', body: JSON.stringify(data) }),
     updateV2: (id: string, data: UpdateRuleV2Input) =>
       this.request<Rule>(`/rules/${id}/v2`, { method: 'PATCH', body: JSON.stringify(data) }),
-
-    // Migration
-    migratePreview: () => this.request<MigrationPreviewResponse>('/rules/migrate/preview'),
-    migrate: (ids?: string[]) =>
-      this.request<MigrationResponse>('/rules/migrate', {
-        method: 'POST',
-        body: JSON.stringify(ids ? { ids } : {}),
-      }),
-    migrateOne: (id: string) =>
-      this.request<Rule>(`/rules/${id}/migrate`, { method: 'POST', body: '{}' }),
   };
 
   // Violations
   violations = {
     get: (id: string) => this.request<ViolationWithDetails>(`/violations/${id}`),
-    list: (params?: {
-      page?: number;
-      pageSize?: number;
-      serverUserId?: string;
-      userId?: string;
-      userIds?: string[];
-      severity?: string;
-      acknowledged?: boolean;
-      serverIds?: string[];
-      orderBy?: string;
-      orderDir?: 'asc' | 'desc';
-    }) => {
+    list: (params: ViolationListParams = {}) => {
       const searchParams = new URLSearchParams();
-      if (params?.page) searchParams.set('page', String(params.page));
-      if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize));
-      if (params?.serverUserId) searchParams.set('serverUserId', params.serverUserId);
-      if (params?.userId) searchParams.set('userId', params.userId);
-      if (params?.userIds?.length) {
-        for (const id of params.userIds) {
-          searchParams.append('userIds', id);
+      for (const [key, value] of Object.entries(params)) {
+        // `acknowledged: false` is the "pending only" filter, so unlike the
+        // roster list a false here must survive onto the wire.
+        if (value === undefined || value === '') continue;
+        if (Array.isArray(value)) {
+          for (const entry of value) searchParams.append(key, entry);
+        } else {
+          searchParams.set(key, String(value));
         }
       }
-      if (params?.severity) searchParams.set('severity', params.severity);
-      if (params?.acknowledged !== undefined)
-        searchParams.set('acknowledged', String(params.acknowledged));
-      if (params?.serverIds?.length) {
-        for (const id of params.serverIds) {
-          searchParams.append('serverIds', id);
-        }
-      }
-      if (params?.orderBy) searchParams.set('orderBy', params.orderBy);
-      if (params?.orderDir) searchParams.set('orderDir', params.orderDir);
-      return this.request<PaginatedResponse<ViolationWithDetails>>(
+      return this.request<ListResponse<ViolationWithDetails>>(
         `/violations?${searchParams.toString()}`
       );
     },
@@ -901,32 +870,12 @@ class ApiClient {
         body: '{}',
       }),
     dismiss: (id: string) => this.request<void>(`/violations/${id}`, { method: 'DELETE' }),
-    bulkAcknowledge: (params: {
-      ids?: string[];
-      selectAll?: boolean;
-      filters?: {
-        serverIds?: string[];
-        severity?: string;
-        acknowledged?: boolean;
-        userId?: string;
-        userIds?: string[];
-      };
-    }) =>
+    bulkAcknowledge: (params: BulkViolationParams) =>
       this.request<{ success: boolean; acknowledged: number }>('/violations/bulk/acknowledge', {
         method: 'POST',
         body: JSON.stringify(params),
       }),
-    bulkDismiss: (params: {
-      ids?: string[];
-      selectAll?: boolean;
-      filters?: {
-        serverIds?: string[];
-        severity?: string;
-        acknowledged?: boolean;
-        userId?: string;
-        userIds?: string[];
-      };
-    }) =>
+    bulkDismiss: (params: BulkViolationParams) =>
       this.request<{ success: boolean; dismissed: number }>('/violations/bulk', {
         method: 'DELETE',
         body: JSON.stringify(params),
@@ -1632,19 +1581,6 @@ class ApiClient {
     get: () => this.request<Settings>('/settings'),
     update: (data: Partial<Settings>) =>
       this.request<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(data) }),
-    testWebhook: (data: {
-      type: 'discord' | 'custom';
-      url?: string;
-      format?: WebhookFormat;
-      ntfyTopic?: string;
-      ntfyAuthToken?: string;
-      pushoverUserKey?: string;
-      pushoverApiToken?: string;
-    }) =>
-      this.request<{ success: boolean; error?: string }>('/settings/test-webhook', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
     getApiKey: () => this.request<{ token: string | null }>('/settings/api-key'),
     regenerateApiKey: () =>
       this.request<{ token: string }>('/settings/api-key/regenerate', { method: 'POST' }),
@@ -1652,20 +1588,24 @@ class ApiClient {
       this.request<{ showWarning: boolean; stateHash: string }>('/settings/ip-warning'),
   };
 
-  // Channel Routing
-  channelRouting = {
-    getAll: () => this.request<NotificationChannelRouting[]>('/settings/notifications/routing'),
-    update: (
-      eventType: NotificationEventType,
-      data: {
-        discordEnabled?: boolean;
-        webhookEnabled?: boolean;
-        webToastEnabled?: boolean;
-        pushEnabled?: boolean;
-      }
-    ) =>
-      this.request<NotificationChannelRouting>(`/settings/notifications/routing/${eventType}`, {
+  // Notification destinations
+  destinations = {
+    list: () => this.request<Destination[]>('/destinations'),
+    create: (data: CreateDestinationInput) =>
+      this.request<Destination>('/destinations', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: UpdateDestinationInput) =>
+      this.request<Destination>(`/destinations/${id}`, {
         method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string) => this.request<void>(`/destinations/${id}`, { method: 'DELETE' }),
+    test: (id: string) =>
+      this.request<{ success: boolean; error?: string }>(`/destinations/${id}/test`, {
+        method: 'POST',
+      }),
+    testUnsaved: (data: { type: DestinationKind; config: Record<string, unknown> }) =>
+      this.request<{ success: boolean; error?: string }>('/destinations/test', {
+        method: 'POST',
         body: JSON.stringify(data),
       }),
   };

@@ -12,6 +12,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { Queue, Worker, UnrecoverableError, type Job, type ConnectionOptions } from 'bullmq';
+import { getBullPrefix, queueConnectionOptions } from './queueConnection.js';
 import { isMaintenance } from '../serverState.js';
 import { getRedisPrefix } from '@tracearr/shared';
 import { extendJobLock, MAINTENANCE_LOCK_DURATION_MS } from './lockUtils.js';
@@ -35,6 +36,7 @@ import { normalizeClient, normalizePlatformName } from '../utils/platformNormali
 import { resolutionBucketPredicate, resolutionRankSql } from '../utils/resolutionBuckets.js';
 import { getCacheService, getPubSubService } from '../services/cache.js';
 import { getSetting, setSetting } from '../services/settings.js';
+import { recomputeAllIdentityDates } from '../services/userService.js';
 import {
   rebuildTimescaleViews,
   safeFullRefreshAllAggregates,
@@ -116,8 +118,8 @@ export function initMaintenanceQueue(redisUrl: string): void {
     return;
   }
 
-  connectionOptions = { url: redisUrl };
-  const bullPrefix = `${getRedisPrefix()}bull`;
+  connectionOptions = queueConnectionOptions(redisUrl);
+  const bullPrefix = getBullPrefix();
 
   maintenanceQueue = new Queue<MaintenanceJobData>(QUEUE_NAME, {
     connection: connectionOptions,
@@ -165,7 +167,7 @@ export function startMaintenanceWorker(): void {
     return;
   }
 
-  const bullPrefix = `${getRedisPrefix()}bull`;
+  const bullPrefix = getBullPrefix();
 
   maintenanceWorker = new Worker<MaintenanceJobData>(
     QUEUE_NAME,
@@ -1750,6 +1752,9 @@ async function processBackfillUserDatesJob(
           AND su.joined_at IS NULL
       `);
       joinedAtUpdated = Number(joinedResult.rowCount ?? 0);
+      // Nothing recomputes users.first_joined_at / last_activity_at off a bulk
+      // account rewrite, so the identity rollups follow each step explicitly.
+      await recomputeAllIdentityDates();
     } catch (error) {
       console.error('[Maintenance] Error updating joinedAt:', error);
       totalErrors++;
@@ -1779,6 +1784,7 @@ async function processBackfillUserDatesJob(
           AND (su.last_activity_at IS NULL OR su.last_activity_at < latest.max_started)
       `);
       lastActivityUpdated = Number(activityResult.rowCount ?? 0);
+      await recomputeAllIdentityDates();
     } catch (error) {
       console.error('[Maintenance] Error updating lastActivityAt:', error);
       totalErrors++;

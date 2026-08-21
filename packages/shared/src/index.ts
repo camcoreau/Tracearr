@@ -59,13 +59,12 @@ export type {
   ActionType,
   Action,
   LogOnlyAction,
-  NotifyAction,
+  SendAction,
   AdjustTrustAction,
   SetTrustAction,
   ResetTrustAction,
   KillStreamAction,
   MessageClientAction,
-  NotificationChannelV2,
   RuleActions,
   RuleV2,
   ActionResult,
@@ -108,7 +107,6 @@ export type {
   ServerLiveStats,
   // Settings
   Settings,
-  WebhookFormat,
   UnitSystem,
   // Tailscale
   TailscaleStatus,
@@ -163,8 +161,6 @@ export type {
   NotificationPreferences,
   RateLimitStatus,
   NotificationPreferencesWithStatus,
-  NotificationChannel,
-  NotificationChannelRouting,
   EncryptedPushPayload,
   PushNotificationPayload,
   // SSE (Server-Sent Events)
@@ -193,6 +189,9 @@ export type {
   LinkPlexAccountRequest,
   LinkPlexAccountResponse,
   UnlinkPlexAccountResponse,
+  ReauthorizePlexAccountResponse,
+  ReauthorizedServer,
+  ReauthorizedServerStatus,
   // Version
   VersionInfo,
   // Backup & Restore
@@ -281,6 +280,7 @@ export type {
   GenresResponse,
   MediaVersionEntry,
   MediaAvailabilityEntry,
+  MediaReplacedCopy,
   MediaDetailResponse,
   MediaChildEntry,
   MediaChildrenResponse,
@@ -319,6 +319,17 @@ export type {
   LibrariesResponse,
 } from './types.js';
 
+// Destination type exports
+export type {
+  DestinationKind,
+  DestinationFieldDescriptor,
+  DestinationDescriptor,
+  Destination,
+  CreateDestinationInput,
+  UpdateDestinationInput,
+  NotificationToast,
+} from './destinations.js';
+
 // Schema exports
 export {
   // Common
@@ -344,7 +355,10 @@ export {
   mergeUsersBodySchema,
   mergeUserParamSchema,
   splitServerUserParamSchema,
-  userSortFieldSchema,
+  USER_SORT_FIELDS,
+  userRosterFilterSchema,
+  userListQuerySchema,
+  bulkResetTrustBodySchema,
   // Session
   sessionQuerySchema,
   historyQuerySchema,
@@ -367,6 +381,8 @@ export {
   createRuleV2Schema,
   updateRuleV2Schema,
   ruleConditionsSchema,
+  actionSchema,
+  sendActionSchema,
   hasAtMostOneScope,
   RULE_SCOPE_ERROR_MESSAGE,
   scopeAllowsCrossServerEnforcement,
@@ -377,8 +393,10 @@ export {
   bulkDeleteRulesSchema,
   bulkMigrateRulesSchema,
   // Violation
-  violationSortFieldSchema,
+  VIOLATION_SORT_FIELDS,
+  violationRosterFilterSchema,
   violationQuerySchema,
+  violationBulkBodySchema,
   violationIdParamSchema,
   // Stats
   serverIdFilterSchema,
@@ -426,6 +444,17 @@ export {
   shelvesQuerySchema,
 } from './schemas.js';
 
+// Destination descriptors and schemas
+export {
+  DESTINATION_KINDS,
+  DESTINATION_TYPES,
+  NOTIFICATION_EVENT_TYPES,
+  destinationConfigSchema,
+  notificationEventTypeSchema,
+  createDestinationSchema,
+  updateDestinationSchema,
+} from './destinations.js';
+
 // Schema input type exports
 export type {
   LoginInput,
@@ -450,9 +479,11 @@ export type {
   BulkUpdateRulesInput,
   BulkDeleteRulesInput,
   BulkMigrateRulesInput,
-  ViolationQueryInput,
+  ViolationRosterFilters,
+  ViolationBulkBody,
   ViolationSortField,
   UserSortField,
+  UserRosterFilters,
   ServerIdFilterInput,
   DashboardQueryInput,
   StatPeriod,
@@ -576,6 +607,10 @@ export { formatEpisodeLabel, type FormatEpisodeLabelOptions } from './media.js';
 
 // Alphabet rail letters
 export { LETTER_RAIL_ALPHABET } from './catalogLetters.js';
+
+// List-query contract
+export { listSortSchema, listDateBoundSchema, listPageCount } from './listQuery.js';
+export type { ListMeta, ListResponse } from './listQuery.js';
 
 // Resolution classification
 export {

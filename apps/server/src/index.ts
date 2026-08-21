@@ -42,6 +42,7 @@ import type {
   PlaybackReportingImportProgress,
   MaintenanceJobProgress,
   LibrarySyncProgress,
+  NotificationToast,
 } from '@tracearr/shared';
 
 import authPlugin, { loadJwtRevokeSettings } from './plugins/auth.js';
@@ -63,7 +64,7 @@ import { stopImageCacheCleanup } from './services/imageProxy.js';
 import { debugRoutes } from './routes/debug.js';
 import { mobileRoutes } from './routes/mobile.js';
 import { notificationPreferencesRoutes } from './routes/notificationPreferences.js';
-import { channelRoutingRoutes } from './routes/channelRouting.js';
+import { destinationRoutes } from './routes/destinations.js';
 import { versionRoutes } from './routes/version.js';
 import { maintenanceRoutes } from './routes/maintenance.js';
 import { publicRoutes } from './routes/public.js';
@@ -79,6 +80,8 @@ import {
 } from './routes/settings.js';
 import { initializeEncryption, migrateToken, looksEncrypted } from './utils/crypto.js';
 import { publicApiRateLimitKey } from './utils/publicApiRateLimitKey.js';
+import { registerErrorHandler } from './utils/errors.js';
+import { resolveWebAsset } from './utils/webRoot.js';
 import { geoipService } from './services/geoip.js';
 import { tailscaleService } from './services/tailscale.js';
 import { geoasnService } from './services/geoasn.js';
@@ -100,6 +103,12 @@ import {
   startNotificationWorker,
   shutdownNotificationQueue,
 } from './jobs/notificationQueue.js';
+import { initDestinationCrypto } from './services/notifications/destinationCrypto.js';
+import { invalidateDestinationsCache } from './services/notifications/destinationStore.js';
+import {
+  runDestinationsMigration,
+  sweepDestinationConfigs,
+} from './services/notifications/destinationsMigration.js';
 import { initKillQueue, startKillWorker, shutdownKillQueue } from './jobs/killQueue.js';
 import { initImportQueue, startImportWorker, shutdownImportQueue } from './jobs/importQueue.js';
 import {
@@ -152,6 +161,7 @@ import { initHeavyOpsLock } from './jobs/heavyOpsLock.js';
 import { startConnectionBudget, stopConnectionBudget } from './services/connectionBudget.js';
 import { initPushRateLimiter } from './services/pushRateLimiter.js';
 import { initializeV2Rules } from './services/rules/v2Integration.js';
+import { rehydratePauseWakes, stopPauseWakes } from './services/rules/wakes/pauseWakes.js';
 import { processPushReceipts } from './services/pushNotification.js';
 import { cleanupMobileTokens } from './jobs/cleanupMobileTokens.js';
 import { db, checkDatabaseConnection } from './db/client.js';
@@ -380,6 +390,13 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
 
   // Utility plugins
   await app.register(sensible);
+
+  // The SPA fallback below claims the not-found slot in production, and Fastify
+  // throws on a second handler for the same scope - so hand off the 404 half
+  // only when that branch is inactive.
+  const webDistPath = resolve(PROJECT_ROOT, 'apps/web/dist');
+  const serveSpa = process.env.NODE_ENV === 'production' && existsSync(webDistPath);
+  registerErrorHandler(app, { notFound: !serveSpa });
   await app.register(cookie, {
     secret: process.env.COOKIE_SECRET,
   });
@@ -393,7 +410,9 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
   // Health check endpoint — always reachable, even in maintenance mode.
   // Every value returned here is read from in-memory caches; nothing awaits
   // a network call, so the handler is effectively synchronous.
-  app.get('/health', () => {
+  app.get('/health', (_request, reply) => {
+    // The web client polls this to decide if we're up; a cached answer is a wrong answer
+    reply.header('Cache-Control', 'no-store');
     const dbHealthy = isDbHealthy();
     const redisHealthy = isRedisHealthy();
     const mode = getServerMode();
@@ -461,7 +480,7 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
   await app.register(violationRoutes, { prefix: `${API_BASE_PATH}/violations` });
   await app.register(statsRoutes, { prefix: `${API_BASE_PATH}/stats` });
   await app.register(settingsRoutes, { prefix: `${API_BASE_PATH}/settings` });
-  await app.register(channelRoutingRoutes, { prefix: `${API_BASE_PATH}/settings/notifications` });
+  await app.register(destinationRoutes, { prefix: `${API_BASE_PATH}/destinations` });
   await app.register(importRoutes, { prefix: `${API_BASE_PATH}/import` });
   await app.register(imageRoutes, { prefix: `${API_BASE_PATH}/images` });
   await app.register(debugRoutes, { prefix: `${API_BASE_PATH}/debug` });
@@ -477,9 +496,7 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
   await app.register(backupRoutes, { prefix: `${API_BASE_PATH}/backup` });
 
   // Serve static frontend in production
-  const webDistPath = resolve(PROJECT_ROOT, 'apps/web/dist');
-
-  if (process.env.NODE_ENV === 'production' && existsSync(webDistPath)) {
+  if (serveSpa) {
     // Read index.html once at startup for <base> tag injection
     const indexHtmlPath = resolve(webDistPath, 'index.html');
     const cachedIndexHtml = readFileSync(indexHtmlPath, 'utf-8');
@@ -509,11 +526,13 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
       // request.url is already stripped by rewriteUrl
       const urlPath = request.url.split('?')[0]!;
 
-      // Serve static files (paths with a file extension)
+      // Serve static files (paths with a file extension). resolveWebAsset
+      // returns null for anything escaping the web root, so a crafted path
+      // falls through to the SPA response instead of stat-ing the filesystem.
       if (urlPath !== '/' && /\.\w+$/.test(urlPath)) {
-        const fullPath = resolve(webDistPath, urlPath.slice(1));
-        if (existsSync(fullPath)) {
-          return reply.sendFile(urlPath.slice(1));
+        const assetPath = resolveWebAsset(webDistPath, urlPath);
+        if (assetPath && existsSync(resolve(webDistPath, assetPath))) {
+          return reply.sendFile(assetPath);
         }
       }
 
@@ -549,6 +568,7 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     // overlaps an in-flight poll from this instance
     stopPoller();
     stopSSEProcessor();
+    stopPauseWakes();
     stopPluginUpdateChecker();
     await sseManager.stop();
     await stopLeaderLease();
@@ -568,7 +588,7 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
 
   // Probe DB and Redis to decide if we can initialize services now
   const dbOk = await checkDatabaseConnection();
-  let redisOk = false;
+  let redisOk: boolean;
   try {
     // Temporarily connect to test reachability
     const testRedis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
@@ -662,6 +682,10 @@ async function initializeServices(app: FastifyInstance) {
 
   // Load JWT revoke settings — ensures tokens issued before a prior restore are rejected
   await loadJwtRevokeSettings();
+
+  // Generate this install's Plex client identifier on first boot
+  const { initializePlexClientIdentifier } = await import('./lib/plexIdentity.js');
+  await initializePlexClientIdentifier();
 
   // Initialize TimescaleDB features (hypertable, compression, aggregates)
   try {
@@ -781,6 +805,19 @@ async function initializeServices(app: FastifyInstance) {
   const cacheService = createCacheService(app.redis);
   const pubSubService = createPubSubService(app.redis, pubSubRedis);
 
+  const keySource = initDestinationCrypto();
+  app.log.info(`Destination secrets keyed from ${keySource}`);
+
+  // Unwrapped on purpose: a half-applied migration must reach the boot recovery loop, not leave
+  // rules pointing at destinations that were never inserted.
+  await runDestinationsMigration();
+
+  try {
+    await sweepDestinationConfigs();
+  } catch (err) {
+    app.log.warn({ err }, 'Failed to sweep destination configs');
+  }
+
   // Initialize push notification rate limiter (uses Redis for sliding window counters)
   initPushRateLimiter(app.redis);
   app.log.info('Push notification rate limiter initialized');
@@ -892,6 +929,9 @@ async function initializeServices(app: FastifyInstance) {
     // Don't throw - version checks are non-critical
   }
 
+  // Registers the rule subscribers; the inactivity worker below dispatches into them.
+  initializePoller(cacheService, pubSubService);
+
   // Initialize inactivity check queue (monitors inactive accounts)
   try {
     initInactivityCheckQueue(redisUrl, app.redis, pubSubService.publish.bind(pubSubService));
@@ -938,9 +978,6 @@ async function initializeServices(app: FastifyInstance) {
     app.log.error({ err }, 'Failed to initialize plex token refresh queue');
     // Don't throw - legacy tokens don't need refreshing and login has its own fallback
   }
-
-  // Initialize poller with cache services
-  initializePoller(cacheService, pubSubService);
 
   // Initialize SSE manager and processor for real-time Plex updates
   try {
@@ -1113,6 +1150,19 @@ async function initializePostListen(app: FastifyInstance) {
             data as { current: string; latest: string; releaseUrl: string }
           );
           break;
+        case WS_EVENTS.DESTINATIONS_CHANGED:
+          invalidateDestinationsCache();
+          broadcastToSessions('destinations:changed');
+          break;
+        case WS_EVENTS.NOTIFICATION_TOAST:
+          broadcastToSessions('notification:toast', data as NotificationToast);
+          break;
+        case WS_EVENTS.SERVER_DOWN:
+          broadcastToSessions('server:down', data as { serverId: string; serverName: string });
+          break;
+        case WS_EVENTS.SERVER_UP:
+          broadcastToSessions('server:up', data as { serverId: string; serverName: string });
+          break;
         default:
           // Unknown event, ignore
           break;
@@ -1145,6 +1195,12 @@ async function initializePostListen(app: FastifyInstance) {
       app.log.error({ err }, 'Failed to start SSE connections - falling back to polling');
     }
 
+    try {
+      await rehydratePauseWakes();
+    } catch (err) {
+      app.log.error({ err }, 'Failed to rehydrate pause wakes');
+    }
+
     // One bounded pass per leadership term; nothing else sweeps these rows.
     void backfillMissingServerIdentifiers(app.log)
       .then((filled) => {
@@ -1158,6 +1214,7 @@ async function initializePostListen(app: FastifyInstance) {
   const stopProducers = async (): Promise<void> => {
     stopPoller();
     stopSSEProcessor();
+    stopPauseWakes();
     stopPluginUpdateChecker();
     await sseManager.stop();
   };
@@ -1234,7 +1291,7 @@ function startRecoveryLoop(app: FastifyInstance, intervalMs: number = RECOVERY_I
 
       const dbOk = await checkDatabaseConnection();
       setDbHealthy(dbOk);
-      let redisOk = false;
+      let redisOk: boolean;
       try {
         const testRedis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
           connectTimeout: 5000,
@@ -1325,6 +1382,7 @@ async function start() {
         app.log.info('Entering maintenance mode — shutting down services');
         stopPoller();
         stopSSEProcessor();
+        stopPauseWakes();
         stopPluginUpdateChecker();
         void sseManager
           .stop()

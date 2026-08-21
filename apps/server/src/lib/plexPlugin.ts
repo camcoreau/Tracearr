@@ -62,12 +62,15 @@ async function createPlexSession(ctx: PlexEndpointCtx, userId: string) {
   return { session, user };
 }
 
-interface PlexTokenMetadata {
+export interface PlexTokenMetadata {
   token: string;
   tokenKind: 'jwt' | 'legacy';
   refreshToken: string | null;
   expiresAt: Date | null;
 }
+
+// Transaction handle, or the plain db client when there's no surrounding transaction
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0] | typeof db;
 
 /**
  * Ensure the auth_accounts plex row exists for this (user, plex.tv account).
@@ -78,16 +81,17 @@ interface PlexTokenMetadata {
  * stored so the daily refresh job can renew them. Legacy tokens have no
  * expiry, so those columns stay null and the row is just a long-lived token.
  */
-async function upsertPlexAuthAccount(
+export async function upsertPlexAuthAccount(
   userId: string,
   plexAccountId: string,
-  tokenInfo: PlexTokenMetadata
+  tokenInfo: PlexTokenMetadata,
+  tx: Tx = db
 ) {
   const isJwt = tokenInfo.tokenKind === 'jwt';
   const refreshToken = isJwt ? tokenInfo.refreshToken : null;
   const accessTokenExpiresAt = isJwt ? tokenInfo.expiresAt : null;
 
-  await db
+  await tx
     .insert(authAccounts)
     .values({
       id: randomUUID(),
@@ -228,13 +232,19 @@ export const plexPlugin = () =>
 
             // Priority 3: server_users.externalId (server-synced users)
             if (!existingUser) {
+              // Constrained to plex servers: authResult.id is a plex.tv account
+              // id, and the poller writes external_id from whatever an upstream
+              // reports, so a hostile Jellyfin/Emby server could otherwise plant
+              // one and claim the owner's identity.
               const fallbackServerUsers = await db
-                .select({ userId: serverUsers.userId })
+                .select({ userId: serverUsers.userId, serverType: servers.type })
                 .from(serverUsers)
+                .innerJoin(servers, eq(serverUsers.serverId, servers.id))
                 .where(eq(serverUsers.externalId, authResult.id))
-                .limit(1);
-              if (fallbackServerUsers[0]) {
-                existingUser = await getUserById(fallbackServerUsers[0].userId);
+                .limit(10);
+              const plexRow = fallbackServerUsers.find((r) => r.serverType === 'plex');
+              if (plexRow) {
+                existingUser = await getUserById(plexRow.userId);
               }
             }
 
@@ -297,6 +307,11 @@ export const plexPlugin = () =>
             // No user - first-run setup. Fail closed if an owner already exists.
             await assertSignupAllowed();
 
+            // Claim code guard before the outbound probes below: getServers and
+            // testServerConnections reach hosts named by the caller's own plex
+            // account, so an ungated instance is a LAN scanner.
+            assertClaimCode(claimCode);
+
             const plexServers = await PlexClient.getServers(authResult.token);
 
             const tempToken = randomUUID().replace(/-/g, '');
@@ -348,8 +363,7 @@ export const plexPlugin = () =>
             }
 
             // No servers - create the first user without a server connection.
-            assertClaimCode(claimCode);
-
+            // (Claim code already checked above, before the outbound probes.)
             const [newUser] = await db
               .insert(users)
               .values({

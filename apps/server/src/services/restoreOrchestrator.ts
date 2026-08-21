@@ -28,6 +28,7 @@ import {
 import { closeDatabase, recreatePool, runMigrations } from '../db/client.js';
 import { setSetting, resetSettingsCache } from './settings.js';
 import { invalidateRulesCache } from '../jobs/poller/database.js';
+import { publishDestinationsChanged } from './notifications/destinationStore.js';
 import { loadJwtRevokeSettings } from '../plugins/auth.js';
 import { initTimescaleDB } from '../db/timescale.js';
 import { closeAuth } from '../lib/auth.js';
@@ -46,6 +47,16 @@ export async function reinitDatabaseConsumers(): Promise<void> {
   await closeAuth();
   invalidateRulesCache();
   resetSettingsCache();
+  await publishDestinationsChanged();
+}
+
+/**
+ * Restore progress reaches unauthenticated callers through /health, so the
+ * stored error carries no stderr, path, or connection detail. The real text
+ * still goes to the log above.
+ */
+export function classifyRestoreError(_raw: unknown): string {
+  return 'restore failed - see server logs';
 }
 
 function setPhase(phase: RestorePhase, message: string, error?: string): void {
@@ -55,7 +66,7 @@ function setPhase(phase: RestorePhase, message: string, error?: string): void {
     phase,
     message,
     startedAt: new Date().toISOString(),
-    ...(error ? { error } : {}),
+    ...(error ? { error: classifyRestoreError(error) } : {}),
     ...(phase === 'failed' ? { failedAtPhase: lastPhase } : {}),
   });
 }
@@ -183,10 +194,13 @@ export async function orchestrateRestore(
         app.log.info('Rollback from restore point succeeded');
         setPhase('failed', 'Restore failed. Your previous data has been restored.', message);
       } catch (rollbackErr) {
-        app.log.error({ err: rollbackErr }, 'Rollback from restore point also failed');
+        app.log.error(
+          { err: rollbackErr, restorePointPath },
+          'Rollback from restore point also failed; restore point retained'
+        );
         setPhase(
           'failed',
-          `Restore and rollback both failed. Restore point available at: ${restorePointPath}`,
+          'Restore and rollback both failed. The restore point was retained - see server logs.',
           message
         );
         // Best-effort pool recovery so recovery loop can at least connect

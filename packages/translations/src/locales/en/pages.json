@@ -83,7 +83,10 @@
     "suggestionsReview": "Review",
     "suggestionsMatchEmail": "Same email",
     "suggestionsMatchUsername": "Same username",
-    "suggestionsError": "Could not load merge suggestions"
+    "suggestionsError": "Could not load merge suggestions",
+    "filterHasAccessTo": "Has access to",
+    "filterHasAccessToPlaceholder": "Any server",
+    "filterHasAccessToHint": "Shows people with an active account on every server selected."
   },
   "userDetail": {
     "backToUsers": "Back to Users",
@@ -92,9 +95,7 @@
     "statistics": "Statistics",
     "sessions": "Sessions",
     "violations": "Violations",
-    "locations": "Locations",
     "terminationHistory": "Termination History",
-    "noSessionsFound": "No sessions found for this user.",
     "noViolationsFound": "No violations for this user.",
     "noTerminationsFound": "No stream terminations for this user.",
     "byRule": "By / Rule",
@@ -190,8 +191,7 @@
       "colCopies": "Copies",
       "colRecoverable": "Recoverable Space",
       "sameServer": "Same server",
-      "mirror": "Mirror",
-      "pageOf": "Page {{page}} of {{totalPages}}"
+      "mirror": "Mirror"
     },
     "watch": {
       "title": "Watch Analytics",
@@ -288,11 +288,7 @@
   },
   "violations": {
     "title": "Violations",
-    "violationLog": "Violation Log",
-    "noMatches": "No Matches",
     "tryAdjustingFilters": "Try adjusting your filters",
-    "allClear": "All Clear",
-    "noViolationsDetected": "No rule violations detected",
     "selectAllViolations": "Select all {{count}} violations matching filters",
     "dismissViolation": "Dismiss Violation",
     "dismissViolationConfirm": "Are you sure you want to dismiss this violation? This will remove it from the violation log permanently.",
@@ -303,6 +299,7 @@
     "noViolationsRecorded": "No violations have been recorded yet.",
     "allSeverities": "All Severities",
     "allStatuses": "All Statuses",
+    "allRules": "All rules",
     "filterPeople": "People",
     "allPeople": "All people",
     "peopleSelectedCount": "{{count}} people",
@@ -405,7 +402,77 @@
     "classicRule": "Classic Rule",
     "customRule": "Custom Rule",
     "chooseTemplate": "Choose a Rule Template",
-    "chooseTemplateDesc": "Select a pre-configured rule type to get started quickly."
+    "chooseTemplateDesc": "Select a pre-configured rule type to get started quickly.",
+    "builder": {
+      "destinationDisabled": "Disabled destination",
+      "noDestinations": "No destinations yet. Add one to send notifications.",
+      "errors": {
+        "sendNeedsDestination": "Pick at least one destination",
+        "nameRequired": "Rule name is required",
+        "title": "Please fix the following errors:",
+        "groupRequired": "At least one condition group is required",
+        "conditionRequired": "Each condition group must have at least one condition",
+        "scopeIncomplete": "Pick a target for the selected scope"
+      },
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Optional description",
+      "severityLabel": "Severity",
+      "activeLabel": "Active",
+      "saving": "Saving...",
+      "selectPlaceholder": "Select...",
+      "searchPlaceholder": "Search...",
+      "noMatches": "No matches",
+      "clearSelection": "Clear selection",
+      "selectedCount": "{{count}} selected",
+      "scope": {
+        "label": "Scope",
+        "global": "Global",
+        "server": "Specific server",
+        "account": "Specific account",
+        "person": "Person (all their servers)",
+        "serverLabel": "Server",
+        "serverPlaceholder": "Select server",
+        "accountLabel": "Account",
+        "accountPlaceholder": "Select account",
+        "personLabel": "Person",
+        "personPlaceholder": "Select person",
+        "noServers": "No servers connected yet.",
+        "enforceAcrossServers": "Enforce across servers",
+        "enforceAcrossServersDescription": "When on, this rule can act on a person's sessions on any of their servers, not just the one that triggered it. Off by default."
+      },
+      "conditions": {
+        "title": "Conditions",
+        "description": "Define when this rule should trigger. Groups are combined with AND logic.",
+        "groupLabel": "Group {{number}}",
+        "groupHint": "conditions match with OR logic",
+        "removeGroup": "Remove group",
+        "addCondition": "Add OR condition",
+        "addGroup": "Add AND condition group",
+        "removeCondition": "Remove condition",
+        "fieldPlaceholder": "Select field",
+        "operatorPlaceholder": "Operator",
+        "windowPrefix": "in",
+        "windowUnit": "hrs",
+        "uniqueDevices": "Unique devices",
+        "uniqueDevicesHint": "When checked, only compares sessions from different physical devices. Uncheck to include all sessions regardless of device.",
+        "uniqueIps": "Unique IPs",
+        "uniqueIpsHint": "When checked, only counts sessions from different IP addresses. Use this to detect account sharing while allowing same-household usage.",
+        "allDeviceTypes": "All device types",
+        "deviceTypesHint": "Only count streams from the selected device types. Leave empty to count every device.",
+        "yes": "Yes",
+        "no": "No",
+        "recentlySeen": "Recently seen",
+        "allCountries": "All countries"
+      },
+      "actions": {
+        "title": "Additional Actions",
+        "description": "Optional side-effects when conditions are met. A violation is always created automatically.",
+        "add": "Add action",
+        "remove": "Remove action",
+        "typePlaceholder": "Select action",
+        "typeLabel": "Action"
+      }
+    }
   },
   "terminateStream": {
     "title": "Terminate Stream",
@@ -461,6 +528,7 @@
       "serversConnected_one": "{{count}} server connected",
       "serversConnected_other": "{{count}} servers connected",
       "unlinkAccount": "Unlink this Plex account",
+      "reauthorizeAccount": "Reauthorize this Plex account",
       "deleteServersFirst": "Delete connected servers first to unlink this account",
       "linkedAccounts": "Linked Plex Accounts",
       "linkedAccountsDesc": "Manage the Plex accounts you can add servers from.",
@@ -468,35 +536,57 @@
       "unlinkPlexAccount": "Unlink Plex Account",
       "unlinkConfirm": "Are you sure you want to unlink this Plex account? You won't be able to add servers from this account until you link it again."
     },
-    "notifications": {
-      "title": "Notification Agents",
-      "description": "Configure notification channels and select which events each agent should receive.",
-      "loadingSettings": "Loading notification settings...",
-      "addAgent": "Add Notification Agent",
-      "editAgent": "Edit Notification Agent",
-      "addAgentDesc": "Choose a notification service and configure it.",
-      "editAgentDesc": "Update the notification agent configuration.",
-      "noAgents": "No notification agents configured",
-      "noAgentsHint": "Add an agent to receive notifications about sharing violations and stream events.",
-      "agentType": "Agent Type",
-      "selectType": "Select type...",
-      "webhookUrl": "Webhook URL",
-      "webhookUrlPlaceholder": "https://...",
-      "triggerEvents": "Trigger Events",
-      "allEvents": "All Events",
-      "customEvents": "Custom Events",
-      "eventSelection": "Event Selection",
-      "testingAgent": "Testing...",
-      "testAgent": "Test Agent",
-      "removeAgentTitle": "Remove {{name}}?",
-      "removeAgentDesc": "This will remove {{name}} and disable all its notifications. You can add it back later.",
-      "webhookAgents": "Webhook Agents",
-      "oneWebhookLimit": "Only one webhook agent can be active at a time.",
-      "currentlyConfigured": "{{name}} is currently configured.",
-      "allAgentsConfigured": "All notification agents are already configured.",
-      "noConfigNeeded": "No configuration needed for this agent.",
-      "saveAgent": "Add Agent",
-      "updateAgent": "Update Agent"
+    "destinations": {
+      "title": "Notification destinations",
+      "description": "Where notifications go. Add as many as you like; each one picks the system events it receives, and rules can send to any of them.",
+      "add": "Add destination",
+      "empty": "No destinations yet.",
+      "ownerOnly": "Only the owner can manage notification destinations.",
+      "eventsLabel": "Events",
+      "builtinNote": "Built in",
+      "pushNote": "Delivered to paired mobile devices; each device filters in its own notification settings.",
+      "webToastNote": "Toasts in this browser.",
+      "usedBy": "Used by {{count}} rule",
+      "usedBy_other": "Used by {{count}} rules",
+      "reencrypt": "Re-enter this destination's secret",
+      "secretSet": "Set (leave blank to keep)",
+      "clearSecret": "Clear",
+      "test": "Test",
+      "testHint": "Save first to test",
+      "delete": "Delete",
+      "deleteConfirm": "Delete {{name}}? Rules that send to it will be blocked until they are updated.",
+      "events": {
+        "violation_detected": "Violation detected",
+        "stream_started": "Stream started",
+        "stream_stopped": "Stream stopped",
+        "server_down": "Server down",
+        "server_up": "Server up",
+        "plugin_update_available": "Plugin update available"
+      },
+      "types": {
+        "discord": "Discord",
+        "jsonWebhook": "Webhook (JSON)",
+        "ntfy": "ntfy",
+        "gotify": "Gotify",
+        "apprise": "Apprise",
+        "pushover": "Pushover",
+        "push": "Mobile push",
+        "webToast": "Browser toasts"
+      },
+      "fields": {
+        "webhookUrl": "Webhook URL",
+        "url": "URL",
+        "serverUrl": "Server URL",
+        "apiUrl": "API URL",
+        "topic": "Topic",
+        "authToken": "Auth token",
+        "userKey": "User key",
+        "apiToken": "API token"
+      },
+      "hints": {
+        "authTokenOptional": "Optional for public topics"
+      },
+      "testNeedsForm": "Fill in the required fields to test"
     },
     "jobs": {
       "runNow": "Run Now",
@@ -518,6 +608,7 @@
     "interruptionTitle": "Service interruption",
     "startingDescription": "The server is waiting for backend services to become available. This page will automatically refresh when everything is ready.",
     "interruptionDescription": "One or more backend services have become unavailable. This page will automatically refresh when connectivity is restored.",
+    "unreachable": "Can't reach the Tracearr server right now. Live updates are paused and will resume on their own.",
     "restoreTitle": "Restoring from backup...",
     "restoreFailed": "Restore failed",
     "restorePhase": {
@@ -755,7 +846,8 @@
         },
         "availability": {
           "added": "added {{date}}",
-          "removed": "removed {{date}}"
+          "addedRemoved": "added {{added}} – removed {{removed}}",
+          "replaced": "replaced {{date}}"
         },
         "removedEverywhere": {
           "caption": "No longer available on any connected server"

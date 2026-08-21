@@ -80,7 +80,10 @@
     "suggestionsReview": "Review",
     "suggestionsMatchEmail": "Same email",
     "suggestionsMatchUsername": "Same username",
-    "suggestionsError": "Could not load merge suggestions"
+    "suggestionsError": "Could not load merge suggestions",
+    "filterHasAccessTo": "Has access to",
+    "filterHasAccessToPlaceholder": "Any server",
+    "filterHasAccessToHint": "Shows people with an active account on every server selected."
   },
   "userDetail": {
     "backToUsers": "Back to Users",
@@ -89,9 +92,7 @@
     "statistics": "Statistics",
     "sessions": "Sessions",
     "violations": "Violations",
-    "locations": "Locations",
     "terminationHistory": "Termination History",
-    "noSessionsFound": "No sessions found for this user.",
     "noViolationsFound": "No violations for this user.",
     "noTerminationsFound": "No stream terminations for this user.",
     "byRule": "By / Rule",
@@ -185,8 +186,7 @@
       "colCopies": "Copies",
       "colRecoverable": "Recoverable Space",
       "sameServer": "Same server",
-      "mirror": "Mirror",
-      "pageOf": "Page {{page}} of {{totalPages}}"
+      "mirror": "Mirror"
     },
     "watch": {
       "title": "Watch Analytics",
@@ -283,11 +283,7 @@
   },
   "violations": {
     "title": "Violations",
-    "violationLog": "Violation Log",
-    "noMatches": "No Matches",
     "tryAdjustingFilters": "Try adjusting your filters",
-    "allClear": "All Clear",
-    "noViolationsDetected": "No rule violations detected",
     "selectAllViolations": "Select all {{count}} violations matching filters",
     "dismissViolation": "Dismiss Violation",
     "dismissViolationConfirm": "Are you sure you want to dismiss this violation? This will remove it from the violation log permanently.",
@@ -298,6 +294,7 @@
     "noViolationsRecorded": "No violations have been recorded yet.",
     "allSeverities": "All Severities",
     "allStatuses": "All Statuses",
+    "allRules": "All rules",
     "detail": {
       "notFound": "Violation not found",
       "violationDetails": "Violation Details",
@@ -449,6 +446,7 @@
       "serversConnected_one": "{{count}} server connected",
       "serversConnected_other": "{{count}} servers connected",
       "unlinkAccount": "Unlink this Plex account",
+      "reauthorizeAccount": "Reauthorize this Plex account",
       "deleteServersFirst": "Delete connected servers first to unlink this account",
       "linkedAccounts": "Linked Plex Accounts",
       "linkedAccountsDesc": "Manage the Plex accounts you can add servers from.",
@@ -741,7 +739,8 @@
         },
         "availability": {
           "added": "added {{date}}",
-          "removed": "removed {{date}}"
+          "addedRemoved": "added {{added}} – removed {{removed}}",
+          "replaced": "replaced {{date}}"
         },
         "removedEverywhere": {
           "caption": "No longer available on any connected server"

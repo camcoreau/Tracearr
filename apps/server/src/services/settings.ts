@@ -6,13 +6,7 @@
  */
 
 import { eq, inArray, sql } from 'drizzle-orm';
-import {
-  SESSION_LIMITS,
-  type Settings,
-  type WebhookFormat,
-  type UnitSystem,
-  type BackupScheduleType,
-} from '@tracearr/shared';
+import { SESSION_LIMITS, type Settings, type BackupScheduleType } from '@tracearr/shared';
 import { db } from '../db/client.js';
 import { settings } from '../db/schema.js';
 
@@ -21,13 +15,6 @@ const PUBLIC_DEFAULTS: Settings = {
   // Settings interface fields
   allowGuestAccess: false,
   unitSystem: 'metric',
-  discordWebhookUrl: null,
-  customWebhookUrl: null,
-  webhookFormat: null,
-  ntfyTopic: null,
-  ntfyAuthToken: null,
-  pushoverUserKey: null,
-  pushoverApiToken: null,
   pollerEnabled: true,
   pollerIntervalMs: 15000,
   usePlexGeoip: false,
@@ -69,6 +56,9 @@ const INTERNAL_DEFAULTS = {
   // ISO 8601 - set once when pre-changeover snapshot history has been
   // regenerated in multi-version semantics; retires the growth fit clamp
   snapshotsNormalizedAt: null as string | null,
+  // Per-install Plex client identifier, generated on first boot. Scopes plex.tv
+  // PINs to this deployment. Served to the web UI, so it is public, not secret.
+  plexClientIdentifier: null as string | null,
 };
 
 type InternalSettings = typeof INTERNAL_DEFAULTS;
@@ -227,37 +217,6 @@ export async function getNetworkSettings(): Promise<{
   return {
     externalUrl: s.externalUrl,
     trustProxy: s.trustProxy,
-  };
-}
-
-export interface NotificationSettings {
-  discordWebhookUrl: string | null;
-  customWebhookUrl: string | null;
-  webhookFormat: WebhookFormat | null;
-  ntfyTopic: string | null;
-  ntfyAuthToken: string | null;
-  pushoverUserKey: string | null;
-  pushoverApiToken: string | null;
-  webhookSecret: string | null;
-  mobileEnabled: boolean;
-  unitSystem: UnitSystem;
-}
-
-export async function getNotificationSettings(): Promise<NotificationSettings> {
-  const s = await getSettings([
-    'discordWebhookUrl',
-    'customWebhookUrl',
-    'webhookFormat',
-    'ntfyTopic',
-    'ntfyAuthToken',
-    'pushoverUserKey',
-    'pushoverApiToken',
-    'mobileEnabled',
-    'unitSystem',
-  ]);
-  return {
-    ...s,
-    webhookSecret: null, // TODO: Phase 4
   };
 }
 

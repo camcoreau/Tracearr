@@ -25,7 +25,7 @@ import {
   check,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
-import { MEDIA_TYPES } from '@tracearr/shared';
+import { MEDIA_TYPES, type NotificationEventType } from '@tracearr/shared';
 
 // Server types enum
 export const serverTypeEnum = ['plex', 'jellyfin', 'emby'] as const;
@@ -143,6 +143,12 @@ export const users = pgTable(
     aggregateTrustScore: integer('aggregate_trust_score').notNull().default(100),
     totalViolations: integer('total_violations').notNull().default(0),
 
+    // Identity-level date rollups over ALL of the person's accounts, removed
+    // ones included: removing an account does not un-happen its history. Trust
+    // deliberately does not follow that rule (it prefers active accounts).
+    firstJoinedAt: timestamp('first_joined_at', { withTimezone: true }),
+    lastActivityAt: timestamp('last_activity_at', { withTimezone: true }),
+
     // Timestamps
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -158,6 +164,15 @@ export const users = pgTable(
     uniqueIndex('users_email_unique').on(table.email),
     index('users_plex_account_id_idx').on(table.plexAccountId),
     index('users_role_idx').on(table.role),
+    // Roster sort orders. Each one has to match the ORDER BY in
+    // routes/users/list.ts key for key, direction for direction, nulls for
+    // nulls, or the plan drops from an index scan to an incremental sort.
+    index('users_display_name_idx').on(sql`coalesce(${table.name}, ${table.username})`, table.id),
+    index('users_aggregate_trust_idx').on(table.aggregateTrustScore.desc(), table.id),
+    index('users_first_joined_idx').on(table.firstJoinedAt.desc().nullsLast(), table.id),
+    index('users_last_activity_idx').on(table.lastActivityAt.desc().nullsLast(), table.id),
+    // Roster search matches users.name or any account's username
+    index('users_name_trgm_idx').using('gin', sql`${table.name} gin_trgm_ops`),
   ]
 );
 
@@ -250,6 +265,7 @@ export const serverUsers = pgTable(
     index('server_users_user_idx').on(table.userId),
     index('server_users_server_idx').on(table.serverId),
     index('server_users_username_idx').on(table.username),
+    index('server_users_username_trgm_idx').using('gin', sql`${table.username} gin_trgm_ops`),
     // For Plex sync matching by plex.tv account ID
     index('server_users_plex_account_idx').on(table.serverId, table.plexAccountId),
     // For account inactivity rule queries
@@ -618,9 +634,6 @@ export const notificationEventTypeEnum = [
   'violation_detected',
   'stream_started',
   'stream_stopped',
-  'concurrent_streams',
-  'new_device',
-  'trust_score_changed',
   'server_down',
   'server_up',
   'plugin_update_available',
@@ -648,6 +661,42 @@ export const notificationChannelRouting = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('notification_channel_routing_event_type_idx').on(table.eventType)]
+);
+
+export const destinationKindEnum = [
+  'discord',
+  'json_webhook',
+  'ntfy',
+  'gotify',
+  'apprise',
+  'pushover',
+  'push',
+  'web_toast',
+] as const;
+
+// Outbound notification destinations; config is AES-GCM ciphertext (destinationCrypto), NULL for built-ins.
+export const destinations = pgTable(
+  'destinations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull().unique(),
+    type: varchar('type', { length: 30 }).notNull().$type<(typeof destinationKindEnum)[number]>(),
+    config: text('config'),
+    events: jsonb('events').notNull().default([]).$type<NotificationEventType[]>(),
+    enabled: boolean('enabled').notNull().default(true),
+    builtin: boolean('builtin').notNull().default(false),
+    configStatus: varchar('config_status', { length: 20 })
+      .notNull()
+      .default('ok')
+      .$type<'ok' | 'reencrypt'>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('destinations_builtin_type_uidx')
+      .on(table.type)
+      .where(sql`${table.builtin} = true`),
+  ]
 );
 
 // Termination trigger type enum
@@ -1054,6 +1103,12 @@ export const libraryItems = pgTable(
     genres: text('genres').array(),
     // Soft delete - set when the item disappears from the server; upsert clears it
     removedAt: timestamp('removed_at', { withTimezone: true }),
+    // 'event' (SSE removal, accurate time) or 'scan' (removed_at = when the scan noticed)
+    removedSource: varchar('removed_source', { length: 10 }),
+    // id of the copy this row replaced; set once by event-witnessed replacement linking
+    replacesLibraryItemId: uuid('replaces_library_item_id'),
+    // When Tracearr first saw this rating key; app-set on insert, null = predates tracking
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }),
 
     // Browsing UI: cached poster thumbnail path and dominant color accent
     thumbPath: text('thumb_path'),
@@ -1113,6 +1168,11 @@ export const libraryItems = pgTable(
     index('idx_library_items_resolution_active')
       .on(table.videoResolution)
       .where(sql`${table.removedAt} IS NULL`),
+
+    // The availability query's hide-a-linked-tombstone probe seq-scans without this
+    index('idx_library_items_replaces_active')
+      .on(table.replacesLibraryItemId)
+      .where(sql`${table.replacesLibraryItemId} IS NOT NULL AND ${table.removedAt} IS NULL`),
 
     index('idx_library_items_dynamic_range_active')
       .on(table.videoDynamicRange)

@@ -10,6 +10,7 @@ import { db } from '../db/client.js';
 import { terminationLogs, sessions } from '../db/schema.js';
 import { createMediaServerClient } from './mediaServer/index.js';
 import { getCacheService, getPubSubService } from './cache.js';
+import { dispatch } from './rules/events/dispatcher.js';
 import { clearDbWriteTracking } from '../jobs/poller/dbWriteThrottle.js';
 
 // ============================================================================
@@ -142,7 +143,7 @@ export async function terminateSession(
   // Attempt to terminate the session
   let success = false;
   let errorMessage: string | null = null;
-  let outcome: TerminationOutcome = 'failed';
+  let outcome: TerminationOutcome;
 
   try {
     await client.terminateSession(terminationSessionId, reason);
@@ -178,6 +179,13 @@ export async function terminateSession(
         forceStopped: true,
       })
       .where(eq(sessions.id, session.id));
+
+    await dispatch({
+      type: 'session.stopped',
+      at: now,
+      sessionId: session.id,
+      serverId: session.serverId,
+    });
 
     clearDbWriteTracking(session.id);
 

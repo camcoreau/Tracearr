@@ -90,6 +90,10 @@ const {
   };
 });
 
+const { mockDispatch } = vi.hoisted(() => ({
+  mockDispatch: vi.fn().mockResolvedValue({ violations: [], outcomes: [] }),
+}));
+
 vi.mock('../../../services/leaderLease.js', () => ({
   isLeader: () => true,
 }));
@@ -114,6 +118,7 @@ vi.mock('../../../services/sseManager.js', () => ({
 }));
 vi.mock('../../notificationQueue.js', () => ({ enqueueNotification: vi.fn() }));
 vi.mock('../database.js', () => ({
+  onActiveRulesRefill: vi.fn(),
   getActiveRulesV2: vi.fn().mockResolvedValue([]),
   batchGetIdentityServerUserIds: vi.fn().mockResolvedValue(new Map()),
   batchGetRecentUserSessions: vi.fn().mockResolvedValue(new Map()),
@@ -131,18 +136,19 @@ vi.mock('../sessionLifecycle.js', () => ({
   findActiveSessionByComposite: vi.fn().mockResolvedValue(null),
   handleMediaChangeAtomic: vi.fn(),
   processPollResults: mockProcessPollResults,
-  reEvaluateRulesOnPauseState: vi.fn(),
-  reEvaluateRulesOnTranscodeChange: vi.fn(),
   stopSessionAtomic: vi.fn(),
 }));
-vi.mock('../sessionMapper.js', () => ({
+vi.mock('../../../services/rules/events/dispatcher.js', () => ({
+  dispatch: mockDispatch,
+  subscribe: vi.fn(),
+}));
+vi.mock('../sessionMapper.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   mapMediaSession: mockMapMediaSession,
-  pickStreamDetailFields: vi.fn().mockImplementation((s: unknown) => s),
 }));
 vi.mock('../violations.js', () => ({ broadcastViolations: vi.fn() }));
 
 import { initializePoller, triggerServerPoll } from '../processor.js';
-import { reEvaluateRulesOnTranscodeChange } from '../sessionLifecycle.js';
 import { getActiveRulesV2 } from '../database.js';
 
 const EXISTING_SESSION_ID = 'session-1';
@@ -287,7 +293,7 @@ describe('poller session update guard against stop races', () => {
     await triggerServerPoll('server-1');
 
     expect(mockDb.update).toHaveBeenCalledTimes(1);
-    expect(reEvaluateRulesOnTranscodeChange).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
   });
 
   it('re-evaluates transcode rules when the update affects a row', async () => {
@@ -302,7 +308,8 @@ describe('poller session update guard against stop races', () => {
     await triggerServerPoll('server-1');
 
     expect(mockDb.update).toHaveBeenCalledTimes(1);
-    expect(reEvaluateRulesOnTranscodeChange).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch.mock.calls[0]?.[0]).toMatchObject({ type: 'session.transcode_changed' });
   });
 });
 
