@@ -1,4 +1,4 @@
-name: Ganymede Tracearr live diagnosis
+name: Ganymede Tracearr maintenance cleanup
 
 on:
   push:
@@ -6,87 +6,16 @@ on:
       - agent/tracearr-live-repair-20260821
     paths:
       - .github/workflows/ganymede-tracearr-live.yml
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ganymede-tracearr-live-maintenance
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  diagnose:
-    name: Diagnose live stack
-    runs-on: [self-hosted, linux, x64, camcore, ganymede, docker]
-    timeout-minutes: 10
+  cleanup:
+    runs-on: ubuntu-latest
     steps:
-      - name: Inspect Tracearr, Redis, Docker state
-        shell: bash
-        run: |
-          set +e
-          project="camcore-tracearr"
-
-          echo "=== HOST ==="
-          hostname
-          date --iso-8601=seconds
-          uptime
-          df -h /
-          docker version --format 'client={{.Client.Version}} server={{.Server.Version}}'
-          docker compose version
-
-          echo "=== COMPOSE PROJECTS ==="
-          docker compose ls -a
-
-          echo "=== PROJECT CONTAINERS ==="
-          docker ps -a \
-            --filter "label=com.docker.compose.project=${project}" \
-            --format 'name={{.Names}} service={{.Label "com.docker.compose.service"}} image={{.Image}} status={{.Status}}'
-
-          containers="$(docker ps -aq --filter "label=com.docker.compose.project=${project}")"
-          if [ -z "${containers}" ]; then
-            echo "No containers found for ${project}"
-            exit 1
-          fi
-
-          for id in ${containers}; do
-            name="$(docker inspect --format '{{.Name}}' "${id}" | sed 's#^/##')"
-            echo "=== INSPECT ${name} ==="
-            docker inspect --format 'image={{.Config.Image}} state={{.State.Status}} running={{.State.Running}} restarting={{.State.Restarting}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} restart_count={{.RestartCount}} started={{.State.StartedAt}} finished={{.State.FinishedAt}} error={{.State.Error}}' "${id}"
-            docker inspect --format 'restart_policy={{.HostConfig.RestartPolicy.Name}} healthcheck={{json .Config.Healthcheck}}' "${id}"
-            echo "-- environment variable names --"
-            docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${id}" \
-              | sed -E 's/=.*$/=<set>/' \
-              | sort
-            echo "-- mounts --"
-            docker inspect --format '{{range .Mounts}}type={{.Type}} name={{.Name}} source={{.Source}} destination={{.Destination}} rw={{.RW}}{{println}}{{end}}' "${id}"
-            echo "-- networks --"
-            docker inspect --format '{{range $name, $network := .NetworkSettings.Networks}}name={{$name}} ip={{$network.IPAddress}} aliases={{json $network.Aliases}}{{println}}{{end}}' "${id}"
-            echo "-- health history --"
-            docker inspect --format '{{if .State.Health}}status={{.State.Health.Status}}{{println}}{{range .State.Health.Log}}exit={{.ExitCode}} start={{.Start}} end={{.End}} output={{printf "%q" .Output}}{{println}}{{end}}{{else}}no-healthcheck{{println}}{{end}}' "${id}"
-            echo "-- recent logs (secrets redacted) --"
-            docker logs --tail 250 --timestamps "${id}" 2>&1 \
-              | sed -E \
-                  -e 's#(postgres(ql)?|redis)://[^/@[:space:]]+@#\1://<redacted>@#g' \
-                  -e 's#(DB_PASSWORD|JWT_SECRET|COOKIE_SECRET|PASSWORD|TOKEN)=([^[:space:]]+)#\1=<redacted>#g'
-          done
-
-          echo "=== REDIS DIRECT CHECK ==="
-          docker exec camcore-tracearr-redis redis-cli ping
-          echo "redis_exec_exit=$?"
-
-          echo "=== TRACEARR TO REDIS CHECK ==="
-          docker exec camcore-tracearr node -e 'const net=require("node:net");const s=net.createConnection({host:"redis",port:6379});s.setTimeout(3000);s.on("connect",()=>s.write("*1\\r\\n$4\\r\\nPING\\r\\n"));s.on("data",d=>{console.log(d.toString().trim());s.end();});s.on("timeout",()=>{console.error("timeout");s.destroy();process.exitCode=2});s.on("error",e=>{console.error(e.code||e.message);process.exitCode=1});'
-          echo "tracearr_redis_exit=$?"
-
-          echo "=== REDIS VOLUME ==="
-          redis_volumes="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{println}}{{end}}{{end}}' camcore-tracearr-redis 2>/dev/null)"
-          for volume in ${redis_volumes}; do
-            docker volume inspect --format 'name={{.Name}} driver={{.Driver}} mountpoint={{.Mountpoint}} options={{json .Options}} labels={{json .Labels}}' "${volume}"
-          done
-
-          echo "=== RECENT DOCKER EVENTS ==="
-          docker events --since 30m --until 0s \
-            --filter "label=com.docker.compose.project=${project}" \
-            --format 'time={{.Time}} type={{.Type}} action={{.Action}} actor={{.Actor.Attributes.name}}' \
-            | tail -n 100
+      - run: echo "Temporary Ganymede maintenance workflow retired"
