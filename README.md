@@ -1,307 +1,234 @@
-<p align="center">
-  <img src="apps/web/public/images/og_image.png" alt="Tracearr" width="600" />
-</p>
+# CamCore Tracearr
 
-<p align="center">
-  <strong>Real-time monitoring for Plex, Jellyfin, and Emby. One dashboard for all your servers.</strong>
-</p>
+Private streaming-access monitoring and policy visibility for Cameron-Media,
+maintained for **CamCore — Cameron Family Secure Network**.
 
-<p align="center">
-  <a href="https://github.com/connorgallopo/Tracearr/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/connorgallopo/Tracearr/ci.yml?branch=main&style=flat-square&label=CI" alt="CI Status" /></a>
-  <a title="Crowdin" target="_blank" href="https://crowdin.com/project/tracearr"><img src="https://badges.crowdin.net/tracearr/localized.svg"></a>
-  <a href="https://github.com/connorgallopo/Tracearr/actions/workflows/nightly.yml"><img src="https://img.shields.io/github/actions/workflow/status/connorgallopo/Tracearr/nightly.yml?style=flat-square&label=Nightly" alt="Nightly Build" /></a>
-  <a href="https://github.com/connorgallopo/Tracearr/releases"><img src="https://img.shields.io/github/v/release/connorgallopo/Tracearr?style=flat-square&color=18D1E7" alt="Latest Release" /></a>
-  <a href="https://ghcr.io/connorgallopo/tracearr"><img src="https://img.shields.io/badge/ghcr.io-tracearr-blue?style=flat-square&logo=docker&logoColor=white" alt="Docker" /></a>
-  <a href="https://github.com/connorgallopo/Tracearr/blob/main/LICENSE"><img src="https://img.shields.io/github/license/connorgallopo/Tracearr?style=flat-square" alt="License" /></a>
-  <a href="https://discord.gg/a7n3sFd2Yw"><img src="https://img.shields.io/discord/1444393247978946684?style=flat-square&logo=discord&logoColor=white&label=Discord&color=5865F2" alt="Discord" /></a>
-  <a href="https://docs.tracearr.com"><img src="https://img.shields.io/badge/docs-tracearr.com-18D1E7?style=flat-square" alt="Documentation" /></a>
-  <a href="https://ko-fi.com/E1E21QRI1L"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Ko-Fi" /></a>
-</p>
+[![CI](https://github.com/camcoreau/Tracearr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/camcoreau/Tracearr/actions/workflows/ci.yml)
+[![CamCore image](https://github.com/camcoreau/Tracearr/actions/workflows/camcore-image.yml/badge.svg?branch=main)](https://github.com/camcoreau/Tracearr/actions/workflows/camcore-image.yml)
+[![Licence: AGPL-3.0](https://img.shields.io/badge/licence-AGPL--3.0-blue.svg)](LICENSE)
 
----
+> **CamCore is a privately owned and operated family technology network that
+> delivers secure, reliable and professionally managed digital services for the
+> Cameron household, Cameron-Media and associated family operations.**
 
-Tracearr is a monitoring platform for **Plex**, **Jellyfin**, and **Emby**. Track streams in real-time, dig into playback analytics, and spot account sharing before it gets out of hand.
+**Built for Home. Engineered Like Enterprise.**
 
-## What It Does
+## Service identity
 
-**Multi-Server Dashboard** — Connect Plex, Jellyfin, and Emby to a single interface. No more switching between apps.
+| Surface         | CamCore contract                                                      |
+| --------------- | --------------------------------------------------------------------- |
+| Service         | CamCore Tracearr                                                      |
+| Service family  | CamCore Infrastructure / Cameron-Media                                |
+| Purpose         | Private streaming-access monitoring, analytics and policy enforcement |
+| Private route   | `https://tracearr.camcore.network`                                    |
+| Runtime host    | Ganymede Operations Host                                              |
+| Container image | `ghcr.io/camcoreau/tracearr`                                          |
+| Health endpoint | `/health` on the application container                                |
+| Support         | `https://camcore.au/support.html`                                     |
 
-**Session Tracking** — Complete session history: who watched what, when, where, and on what device. Every stream includes geolocation data.
+Tracearr brings Plex, Jellyfin and Emby activity into one interface. Its
+upstream functionality includes live sessions, playback and library analytics,
+stream mapping, alerts, trust scoring and account-sharing detection. CamCore's
+current deployment contract is centred on Cameron-Media Plex.
 
-**Stream Analytics** — See what's transcoding vs direct playing, track bandwidth usage, and see what people actually watch. Codec breakdowns, resolution stats, device compatibility scores. Enhanced IP geolocation includes ASN data, continent, and postal codes.
+## CamCore-maintained downstream
 
-**Library Analytics** — Four dedicated pages to understand your media collection:
+The CamCore layer is deliberately narrow and reviewable:
 
-- **Overview** — Item counts, storage usage, growth charts over time.
-- **Quality** — Resolution and codec distribution. Track how your 4K vs 1080p ratio changes.
-- **Storage** — Usage predictions, duplicate detection across servers, stale content identification, and ROI analysis (watch hours per GB).
-- **Watch** — Engagement metrics, completion rates, viewing patterns by hour and month, binge detection.
+- CamCore browser, logo, favicon and PWA identity;
+- Cameron-Media-oriented service descriptions;
+- a CamCore GHCR image workflow;
+- a Ganymede Compose deployment with explicit network and storage boundaries;
+- environment examples, health checks, backup guidance and rollback targets.
 
-**Live TV & Music** — Not just movies and shows. Track live TV sessions and music playback across all your servers.
+The underlying application is developed by the
+[Tracearr project](https://github.com/connorgallopo/Tracearr). CamCore does not
+claim authorship of the upstream application or its documentation.
 
-**Stream Map** — Visualize where your streams originate on a world map. Filter by user, server, or time period.
+## Repository, image, deployment and live state
 
-**Sharing Detection** — Six rule types flag suspicious activity:
+These states are related, but they are not interchangeable:
 
-- **Impossible Travel** — NYC then London 30 minutes later? That's not one person.
-- **Simultaneous Locations** — Same account streaming from two cities at once.
-- **Device Velocity** — Too many unique IPs in a short window signals shared credentials.
-- **Concurrent Streams** — Set limits per user.
-- **Geo Restrictions** — Block streaming from specific countries.
-- **Account Inactivity** — Get notified when accounts go dormant for a configurable period.
+| State           | What it proves                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Repository      | The default branch contains reviewed source, branding and a deployment contract.                                 |
+| Published image | The image workflow completed and pushed `latest` and `sha-*` tags for that revision.                             |
+| Deployment      | A specific image tag or digest was applied on Ganymede with the required networks, secrets and volumes.          |
+| Live service    | The private route and `/health` endpoint were checked after deployment and the expected data remained available. |
 
-**Trust Scores** — Users earn (or lose) trust based on behavior. Violations drop scores automatically.
+A commit or merged pull request does not prove deployment or live health. The
+CamCore image workflow currently runs on every push to `main`, including a
+documentation-only merge, so workflow completion must be reported separately
+from an intentional production rollout.
 
-**Real-Time Alerts** — Discord webhooks and custom notifications fire instantly when rules trigger.
+## Runtime architecture
 
-**Public API** — Read-only REST API for third-party integrations. Generate an API key in Settings, then browse the [API reference](https://docs.tracearr.com/api) or the interactive docs built into your instance.
+The source-controlled deployment is defined in
+[`deploy/ganymede/compose.yaml`](deploy/ganymede/compose.yaml).
 
-**Bulk Actions** — Multi-select operations across tables. Acknowledge or dismiss violations in bulk, reset trust scores, enable/disable rules, delete session history.
+```text
+Private client
+     |
+     v
+Nginx Proxy Manager on npm-backend
+     |
+     v
+CamCore Tracearr :3000
+     |
+     +-- PostgreSQL 18.1 / TimescaleDB 2.25.0
+     |
+     +-- Redis 8
+         (data services remain on an internal network)
+```
 
-**Data Import** — Already using Tautulli or Jellystat? Import your watch history so you don't start from scratch.
+Only the Tracearr application joins the existing external `npm-backend`
+network. TimescaleDB and Redis remain on the internal
+`camcore-tracearr-internal` network. The Compose contract publishes no host
+port; Nginx Proxy Manager reaches the application directly through
+`npm-backend`.
 
-## Why Tracearr?
+Persistent state uses these named volumes:
 
-Tautulli only works with Plex. Jellystat only works with Jellyfin and Emby. If you run multiple servers, you're stuck with multiple dashboards.
+| Volume                      | Purpose                      |
+| --------------------------- | ---------------------------- |
+| `camcore-tracearr-database` | TimescaleDB application data |
+| `camcore-tracearr-redis`    | Redis persistence            |
+| `camcore-tracearr-backups`  | Tracearr-created backups     |
 
-Tracearr handles all three. One install, one interface.
+## Image and release contract
 
-|                           | Tautulli | Jellystat | Tracearr |
-| ------------------------- | -------- | --------- | -------- |
-| Watch history             | ✅       | ✅        | ✅       |
-| Statistics & graphs       | ✅       | ✅        | ✅       |
-| Session monitoring        | ✅       | ✅        | ✅       |
-| Transcode analytics       | ✅       | ✅        | ✅       |
-| Live TV & Music           | ✅       | ✅        | ✅       |
-| Account sharing detection | ❌       | ❌        | ✅       |
-| Impossible travel alerts  | ❌       | ❌        | ✅       |
-| Trust scoring             | ❌       | ❌        | ✅       |
-| Plex support              | ✅       | ❌        | ✅       |
-| Jellyfin support          | ❌       | ✅        | ✅       |
-| Emby support              | ❌       | ✅        | ✅       |
-| Multi-server dashboard    | ❌       | ❌        | ✅       |
-| IP geolocation            | ✅       | ✅        | ✅       |
-| Library analytics         | ✅       | ✅        | ✅       |
-| Public API                | ✅       | ✅        | ✅       |
-| Import from Tautulli      | —        | ❌        | ✅       |
-| Import from Jellystat     | ❌       | —         | ✅       |
+Successful builds publish:
 
-## Quick Start
+```text
+ghcr.io/camcoreau/tracearr:latest
+ghcr.io/camcoreau/tracearr:sha-<commit>
+```
+
+The current Compose contract defaults to the mutable `latest` tag. That is a
+source fact, not evidence that the latest image has been deployed.
+
+For a controlled update:
+
+1. confirm the workflow completed for the intended commit;
+2. record the currently deployed image tag and digest;
+3. prefer the corresponding `sha-*` tag as the immutable test and rollback
+   reference;
+4. back up persistent data before a material upgrade;
+5. apply the image without replacing the existing volumes or networks;
+6. verify the container, health endpoint and private route.
+
+## Security boundary
+
+- Tracearr is an administrator-operated private service. Do not expose its
+  route as a public CamCore service.
+- The web container is the only service attached to `npm-backend`; the database
+  and Redis services stay isolated.
+- Keep `DB_PASSWORD`, `JWT_SECRET` and `COOKIE_SECRET` in the deployment secret
+  store or private `.env` file. Never commit populated values.
+- Protect streaming history, IP/geolocation information, user details, API keys
+  and backups as sensitive operational data.
+- Complete the initial administrator setup before connecting Cameron-Media
+  Plex.
+- Report source-security issues according to [`SECURITY.md`](SECURITY.md).
+
+## Deployment
+
+The complete procedure is in the
+[Ganymede deployment guide](deploy/ganymede/README.md). At minimum:
+
+1. confirm Docker, Docker Compose and the external `npm-backend` network are
+   present;
+2. back up the existing database and Tracearr backup volumes;
+3. record the current image tag or digest;
+4. create a private `.env` from
+   [`deploy/ganymede/.env.example`](deploy/ganymede/.env.example) and generate
+   distinct random values for every required secret;
+5. validate the rendered Compose configuration;
+6. pull and start the intended image;
+7. verify the application before treating the rollout as complete.
 
 ```bash
-# Download compose file
-curl -O https://raw.githubusercontent.com/connorgallopo/Tracearr/main/docker/examples/docker-compose.pg18.yml
-
-# Generate secrets
-echo "JWT_SECRET=$(openssl rand -hex 32)" > .env
-echo "COOKIE_SECRET=$(openssl rand -hex 32)" >> .env
-
-# Deploy
-docker compose -f docker-compose.pg18.yml up -d
+cd deploy/ganymede
+docker compose --env-file .env config
+docker compose pull
+docker compose up -d
+docker compose ps
 ```
 
-Open `http://localhost:3000` and connect your Plex, Jellyfin, or Emby server.
+Do not regenerate deployment secrets during a routine update.
 
-**Unraid users:** The supervised image bundles everything in one container with zero configuration. See [docker/examples](docker/examples/README.md) for details.
+## Verification
 
-For Portainer deployment, alternative configurations, or detailed requirements, see the [Docker deployment guide](docker/examples/README.md). For full documentation, visit [docs.tracearr.com](https://docs.tracearr.com).
-
-### Docker Tags
-
-| Tag                  | Description                                        |
-| -------------------- | -------------------------------------------------- |
-| `latest`             | Stable release (requires external DB/Redis)        |
-| `supervised`         | All-in-one stable release                          |
-| `next`               | Latest prerelease (requires external DB/Redis)     |
-| `supervised-next`    | All-in-one prerelease                              |
-| `nightly`            | Bleeding edge nightly (requires external DB/Redis) |
-| `supervised-nightly` | All-in-one nightly build                           |
+Repository validation:
 
 ```bash
-# All-in-one (easiest)
-docker pull ghcr.io/connorgallopo/tracearr:supervised
-
-# Stable (requires external services)
-docker pull ghcr.io/connorgallopo/tracearr:latest
-
-# Living on the edge
-docker pull ghcr.io/connorgallopo/tracearr:nightly
+corepack enable
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm translations:check
+pnpm test
+pnpm build
 ```
 
-### Viewing Logs
-
-**Standard Docker** — Each service runs in its own container:
+Post-deployment validation on Ganymede:
 
 ```bash
-docker logs tracearr          # Application logs
-docker logs tracearr-postgres # Database logs
-docker logs tracearr-redis    # Cache logs
+docker compose -f deploy/ganymede/compose.yaml ps
+docker logs --tail 100 camcore-tracearr
+docker exec camcore-tracearr curl -fsS http://127.0.0.1:3000/health
 ```
 
-**Supervised Docker** — All services run in one container. View logs in the web UI at `/debug` (Log Explorer section), or via CLI:
+Then confirm the private route opens, the expected Cameron-Media connection is
+healthy, historical data remains available and the database and Redis do not
+publish host ports.
 
-```bash
-docker exec tracearr cat /var/log/supervisor/tracearr-error.log
-```
+## Backup and rollback
 
-Available log files: `tracearr.log`, `tracearr-error.log`, `postgres.log`, `postgres-error.log`, `redis.log`, `redis-error.log`, `supervisord.log`
+Before a material update, back up `camcore-tracearr-database` and
+`camcore-tracearr-backups`; include `camcore-tracearr-redis` when preserving its
+durable state is required. Record the deployed image digest alongside the
+backup.
 
-Set `LOG_LEVEL=debug` for verbose output.
+To roll back:
 
-**Proxmox VE LXC** - Each service runs as a systemd unit:
+1. select the previous known-good `sha-*` tag or digest;
+2. keep the same secret values, networks and named volumes;
+3. recreate only the Tracearr application with the previous image;
+4. restore persistent data only when an incompatible migration requires it;
+5. repeat the container, `/health`, private-route and data checks.
 
-```bash
-journalctl -u tracearr   # Application logs
-journalctl -u postgresql # Database logs
-journalctl -u redis      # Cache logs
-```
+## Repository map
 
-### Development Setup
+| Path                                                                         | Purpose                                         |
+| ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| [`apps/web/`](apps/web/)                                                     | Tracearr web interface and CamCore identity     |
+| [`apps/server/`](apps/server/)                                               | Tracearr API and background services            |
+| [`deploy/ganymede/`](deploy/ganymede/)                                       | CamCore deployment contract and operating guide |
+| [`docker/`](docker/)                                                         | Upstream container and development definitions  |
+| [`.github/workflows/camcore-image.yml`](.github/workflows/camcore-image.yml) | CamCore image publication                       |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml)                       | Linting, type checking and automated tests      |
 
-```bash
-# Install dependencies (requires pnpm 10+, Node.js 22+)
-pnpm install
+## Support, ownership and upstream
 
-# Start database services
-docker compose -f docker/docker-compose.dev.yml up -d
+For CamCore deployment, access or operational matters, use
+[CamCore Support](https://camcore.au/support.html).
 
-# Copy and configure environment
-cp .env.example .env
+For general application behaviour, documentation and upstream defects, use the
+Tracearr project's resources:
 
-# Run migrations
-pnpm --filter @tracearr/server db:migrate
+- [Source repository](https://github.com/connorgallopo/Tracearr)
+- [Documentation](https://docs.tracearr.com)
+- [Issue tracker](https://github.com/connorgallopo/Tracearr/issues)
+- [Releases](https://github.com/connorgallopo/Tracearr/releases)
 
-# Start dev servers
-pnpm dev
-```
+CamCore maintains only its downstream branding, image workflow, deployment
+contract and operational guidance. Tracearr and its original source remain the
+work of Connor Gallopo and upstream contributors.
 
-Frontend runs at `localhost:5173`, API at `localhost:3000`.
+## Licence
 
-## Stack
-
-| Layer     | Tech                                      |
-| --------- | ----------------------------------------- |
-| Frontend  | React 19, TypeScript, Tailwind, shadcn/ui |
-| Charts    | Highcharts                                |
-| Maps      | Leaflet                                   |
-| Backend   | Node.js, Fastify                          |
-| Database  | TimescaleDB (PostgreSQL extension)        |
-| Cache     | Redis                                     |
-| Real-time | Socket.io                                 |
-| Monorepo  | pnpm + Turborepo                          |
-
-**TimescaleDB** handles session history. Regular Postgres works for a few months, but long query histories kill performance. TimescaleDB is built for time-series data—dashboard stats stay fast because they're pre-computed, not recalculated every page load.
-
-**Fastify** over Express because it's measurably faster and schema validation catches bad requests before they hit handlers.
-
-**SSE for instant sessions** — Plex streams session updates in real-time via Server-Sent Events, so streams appear the moment they start. Jellyfin and Emby get the same through the [Tracearr SSE plugin](https://github.com/Tracearr/Media-Server-SSE); without it they fall back to polling.
-
-## Project Structure
-
-```
-tracearr/
-├── apps/
-│   ├── web/          # React frontend
-│   ├── server/       # Fastify backend
-│   └── mobile/       # React Native app (iOS & Android)
-├── packages/
-│   ├── shared/       # Types, schemas, constants
-│   └── translations/ # i18n support
-├── docker/           # Compose files
-└── docs/             # Documentation
-```
-
-## Community
-
-Got questions? Found a bug? Want to contribute?
-
-[![Discord](https://img.shields.io/badge/Discord-Join%20the%20server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/a7n3sFd2Yw)
-
-Or [open an issue](https://github.com/connorgallopo/Tracearr/issues) on GitHub.
-
-## Contributing
-
-Contributions welcome. Please:
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/thing`)
-3. Make your changes
-4. Run tests and linting (`pnpm test && pnpm lint`)
-5. Open a PR
-
-Check the [issues](https://github.com/connorgallopo/Tracearr/issues) for things to work on.
-
-### Development with VS Code
-
-Use the included `.vscode/launch.json` to debug both server and web apps directly from VS Code.
-
-Run `pnpm dev` in a terminal to start both apps, then use the "Debug All" configuration to attach the debugger.
-
-## Roadmap
-
-**Shipped**
-
-- [x] Multi-server Plex, Jellyfin, and Emby support
-- [x] Session tracking with full history
-- [x] Sharing detection rules
-- [x] Real-time WebSocket updates
-- [x] SSE for instant session detection (Plex built-in, Jellyfin/Emby via plugin)
-- [x] Discord + webhook notifications
-- [x] Interactive stream map
-- [x] Trust scores
-- [x] Tautulli & Jellystat history import
-- [x] Transcode analytics & device compatibility
-- [x] Live TV & music tracking
-- [x] Stream quality metrics (codec, resolution, bitrate)
-- [x] Stream termination
-- [x] Library analytics (storage, quality, duplicates, engagement)
-- [x] Public REST API with Swagger UI
-- [x] Account inactivity detection
-- [x] Bulk actions for violations, users, rules, sessions
-- [x] Enhanced IP geolocation (ASN, continent, postal code)
-- [x] Rule based automated stream termination
-- [x] Mobile app — [iOS](https://apps.apple.com/us/app/tracearr/id6755941553) and [Android](https://play.google.com/store/apps/details?id=com.tracearr.mobile)
-
-**v1.5** (next)
-
-- [ ] Tiered access controls
-- [ ] Multi-admin support
-- [ ] Account suspension automation
-
-**v1.6**
-
-- [ ] Email notifications
-- [ ] Telegram notifier
-
-## Project Statistics
-
-<p align="center">
-  <img
-    src="https://repobeats.axiom.co/api/embed/4632d7f3bb419e78c5525af0905a488d9f72a753.svg"
-    alt="Repobeats analytics"
-  />
-</p>
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=connorgallopo%2FTracearr&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=connorgallopo/Tracearr&type=date&theme=dark&legend=top-left&sealed_token=gqNERdnUn6ObeSY81Y6zP40vLBLudEzd1HRVmVfMCjaDrF-MPIll0_KXFkm0b36agZvr6RxkGRX_2xeM81kTqylKJN4i8IpTj9RIq9oLT7AxiBYGK0Zrr2IZR0sQpGHAvmnQP0KtQaN03rFdvuUf6ce-MVOZ7XQ7tpf3UGbabcegW5GUP97_aQso0cq3" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=connorgallopo/Tracearr&type=date&legend=top-left&sealed_token=gqNERdnUn6ObeSY81Y6zP40vLBLudEzd1HRVmVfMCjaDrF-MPIll0_KXFkm0b36agZvr6RxkGRX_2xeM81kTqylKJN4i8IpTj9RIq9oLT7AxiBYGK0Zrr2IZR0sQpGHAvmnQP0KtQaN03rFdvuUf6ce-MVOZ7XQ7tpf3UGbabcegW5GUP97_aQso0cq3" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=connorgallopo/Tracearr&type=date&legend=top-left&sealed_token=gqNERdnUn6ObeSY81Y6zP40vLBLudEzd1HRVmVfMCjaDrF-MPIll0_KXFkm0b36agZvr6RxkGRX_2xeM81kTqylKJN4i8IpTj9RIq9oLT7AxiBYGK0Zrr2IZR0sQpGHAvmnQP0KtQaN03rFdvuUf6ce-MVOZ7XQ7tpf3UGbabcegW5GUP97_aQso0cq3" />
- </picture>
-</a>
-
-## License
-
-[AGPL-3.0](LICENSE) — Open source with copyleft protection. If you modify Tracearr and offer it as a service, you share your changes.
-
-This product includes GeoLite2 data created by MaxMind, available from https://www.maxmind.com.
-
----
-
-<p align="center">
-  <sub>For Plex, Jellyfin, and Emby admins who want to see what's actually happening.</sub>
-</p>
-
-This project is tested with BrowserStack.
+This downstream remains subject to the upstream
+[GNU Affero General Public License v3.0](LICENSE). Retain the upstream licence,
+copyright notices and source availability when distributing modified builds.
