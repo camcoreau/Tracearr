@@ -1,7 +1,7 @@
 # CamCore Tracearr
 
 Private streaming-access monitoring and policy visibility for Cameron-Media,
-maintained for **CamCore — Cameron Family Secure Network**.
+maintained for **CamCore – Cameron Family Secure Network**.
 
 [![CI](https://github.com/camcoreau/Tracearr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/camcoreau/Tracearr/actions/workflows/ci.yml)
 [![CamCore image](https://github.com/camcoreau/Tracearr/actions/workflows/camcore-image.yml/badge.svg?branch=main)](https://github.com/camcoreau/Tracearr/actions/workflows/camcore-image.yml)
