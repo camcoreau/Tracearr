@@ -24,7 +24,7 @@ maintained for **CamCore — Cameron Family Secure Network**.
 | Runtime host    | Ganymede Operations Host                                              |
 | Container image | `ghcr.io/camcoreau/tracearr`                                          |
 | Health endpoint | `/health` on the application container                                |
-| Support         | `https://camcore.au/support.html`                                     |
+| Support         | `https://camcore.au/support`                                          |
 
 Tracearr brings Plex, Jellyfin and Emby activity into one interface. Its
 upstream functionality includes live sessions, playback and library analytics,
@@ -213,7 +213,7 @@ To roll back:
 ## Support, ownership and upstream
 
 For CamCore deployment, access or operational matters, use
-[CamCore Support](https://camcore.au/support.html).
+[CamCore Support](https://camcore.au/support).
 
 For general application behaviour, documentation and upstream defects, use the
 Tracearr project's resources:
