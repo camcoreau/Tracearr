@@ -111,8 +111,9 @@ For a controlled update:
 
 1. confirm the workflow completed for the intended commit;
 2. record the currently deployed image tag and digest;
-3. prefer the corresponding `sha-*` tag as the immutable test and rollback
-   reference;
+3. prefer the corresponding `sha-*` tag as a commit-derived test and rollback
+   reference, and record and deploy its digest (or verify that the tag resolves
+   to the recorded digest);
 4. back up persistent data before a material upgrade;
 5. apply the image without replacing the existing volumes or networks;
 6. verify the container, health endpoint and private route.
@@ -193,7 +194,8 @@ backup.
 
 To roll back:
 
-1. select the previous known-good `sha-*` tag or digest;
+1. select the previous recorded image digest, or verify that the known-good
+   `sha-*` tag still resolves to that digest;
 2. keep the same secret values, networks and named volumes;
 3. recreate only the Tracearr application with the previous image;
 4. restore persistent data only when an incompatible migration requires it;
