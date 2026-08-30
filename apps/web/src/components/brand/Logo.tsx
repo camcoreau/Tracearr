@@ -42,25 +42,11 @@ interface LogoIconProps {
 
 export function LogoIcon({ className }: LogoIconProps) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 512 512"
-      className={cn('shrink-0', className)}
-      role="img"
-      aria-label="CamCore"
-    >
-      <path
-        d="M256 48 A208 208 0 1 0 256 464 A208 208 0 0 0 390 415 L338 351 A126 126 0 1 1 338 161 L390 97 A208 208 0 0 0 256 48 Z"
-        fill="#FFFFFF"
-      />
-      <path
-        d="M280 149 A132 132 0 1 1 280 413 L330 352 A55 55 0 1 0 330 210 Z"
-        fill="#FF4B2B"
-      />
-      <path
-        d="M256 198 A58 58 0 1 0 256 314 A58 58 0 0 0 256 198 Z"
-        fill="#FF4B2B"
-      />
-    </svg>
+    <img
+      src="/logo-transparent.png?v=2026-08-30-approved"
+      className={cn('shrink-0 object-contain', className)}
+      alt="CamCore"
+      draggable={false}
+    />
   );
 }
