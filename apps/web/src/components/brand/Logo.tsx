@@ -44,64 +44,22 @@ export function LogoIcon({ className }: LogoIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 210 210"
-      fill="none"
+      viewBox="0 0 512 512"
       className={cn('shrink-0', className)}
       role="img"
       aria-label="CamCore"
     >
-      <defs>
-        <linearGradient id="camcore-cyan" x1="30" y1="25" x2="190" y2="190">
-          <stop stopColor="#18D7F2" />
-          <stop offset="1" stopColor="#0096C7" />
-        </linearGradient>
-        <linearGradient id="camcore-white" x1="20" y1="15" x2="175" y2="170">
-          <stop stopColor="#FFFFFF" />
-          <stop offset="1" stopColor="#DCEBFF" />
-        </linearGradient>
-      </defs>
-
-      <rect x="1" y="1" width="208" height="208" rx="42" fill="#06111F" />
       <path
-        d="M105 12 190 44v48c0 21-3 40-12 58"
-        stroke="url(#camcore-white)"
-        strokeWidth="11"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        d="M256 48 A208 208 0 1 0 256 464 A208 208 0 0 0 390 415 L338 351 A126 126 0 1 1 338 161 L390 97 A208 208 0 0 0 256 48 Z"
+        fill="#FFFFFF"
       />
       <path
-        d="M32 150c-9-18-12-37-12-58V44l85-32"
-        stroke="url(#camcore-white)"
-        strokeWidth="11"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        d="M280 149 A132 132 0 1 1 280 413 L330 352 A55 55 0 1 0 330 210 Z"
+        fill="#FF4B2B"
       />
       <path
-        d="M52 118V82l53-41 53 41v36M145 72V50h18v36"
-        stroke="url(#camcore-white)"
-        strokeWidth="9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <rect x="91" y="82" width="12" height="12" rx="1.5" fill="#FFFFFF" />
-      <rect x="108" y="82" width="12" height="12" rx="1.5" fill="#FFFFFF" />
-      <rect x="91" y="99" width="12" height="12" rx="1.5" fill="#FFFFFF" />
-      <rect x="108" y="99" width="12" height="12" rx="1.5" fill="#FFFFFF" />
-      <path
-        d="M40 143h130M105 143v45"
-        stroke="url(#camcore-cyan)"
-        strokeWidth="10"
-        strokeLinecap="round"
-      />
-      <circle cx="40" cy="143" r="16" fill="#06111F" stroke="url(#camcore-cyan)" strokeWidth="9" />
-      <circle cx="170" cy="143" r="16" fill="#06111F" stroke="url(#camcore-cyan)" strokeWidth="9" />
-      <circle cx="105" cy="143" r="18" fill="url(#camcore-cyan)" />
-      <circle cx="105" cy="188" r="16" fill="#06111F" stroke="url(#camcore-cyan)" strokeWidth="9" />
-      <path
-        d="M57 169c14 12 29 20 48 27 19-7 34-15 48-27"
-        stroke="url(#camcore-white)"
-        strokeWidth="10"
-        strokeLinecap="round"
+        d="M256 198 A58 58 0 1 0 256 314 A58 58 0 0 0 256 198 Z"
+        fill="#FF4B2B"
       />
     </svg>
   );
